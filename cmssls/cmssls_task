@@ -1,0 +1,49 @@
+#!/bin/sh
+
+##H Usage: cmssls_task ACTION
+##H
+##H Available actions:
+##H   help                show this help
+##H   run                 process job status from sites
+##H   updateweb           update web area with the output of last run
+##H
+##H For more details please refer to operations page:
+##H   https://twiki.cern.ch/twiki/bin/view/CMS/GridmapSLS
+
+ME=$(basename $(dirname $0))
+TOP=$(cd $(dirname $0)/../../.. && pwd)
+ROOT=$(cd $(dirname $0)/../.. && pwd)
+CFGDIR=$(dirname $0)
+STATEDIR=$TOP/state/$ME
+LOGDIR=$TOP/logs/$ME
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/kerberos/bin
+WEBDIR={WEBDIR}
+
+# Main routine, perform action requested on command line.
+case ${1:-help} in
+  run )
+    cd $CFGDIR
+    for sls in Feed*; do
+       [ -x $sls ] || continue;
+       if [ "$sls" = "FeedCMSWEB" ]; then
+         ./$sls $STATEDIR
+       else
+         ./$sls > $STATEDIR/sls_$(echo ${sls#Feed}| tr '[A-Z]' '[a-z]').xml
+       fi
+    done
+    ;;
+
+  updateweb )
+    klist -s || { echo "$0: you must have a valid afs kerberos token."; exit 1; }
+    rsync -q -au $STATEDIR/ $WEBDIR/
+    ;;
+
+  help )
+    perl -ne '/^##H/ && do { s/^##H ?//; print }' < $0
+    ;;
+
+  * )
+    echo "$0: unknown action '$1', please try '$0 help' or documentation." 1>&2
+    exit 1
+    ;;
+esac

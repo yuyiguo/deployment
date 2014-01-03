@@ -19,7 +19,7 @@ from DBSSecrets import dbs3_ig_i2
 from DBSSecrets import dbs3_pp3_r
 
 ###phys02 instance
-from DBSSecrets import dbs3_pp2_r       
+from DBSSecrets import dbs3_pp2_r
 
 ###phys01 instance
 from DBSSecrets import dbs3_pp1_r
@@ -42,7 +42,11 @@ security_params = {'prod/global': {'reader': {},
                    'prod/phys03': {'reader': {},
                                   'writer': {}},
                    'prod/phys02': {'reader': {},
+<<<<<<< HEAD
                                   'writer': {}}, 
+=======
+                                  'writer': {}},
+>>>>>>> upmaster
                    'prod/phys01': {'reader': {},
                                   'writer': {}}}
 
