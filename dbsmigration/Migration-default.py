@@ -10,16 +10,16 @@ ROOTDIR = os.path.normcase(os.path.abspath(__file__)).rsplit('/', 3)[0]
 sys.path.append(os.path.join(ROOTDIR,'auth/dbs'))
 
 ###global instance
-from DBSSecrets import dbs3_p1_i2
+from DBSSecrets import dbs3_l2_i2
 
 ###phys03 instance
-from DBSSecrets import dbs3_l_i2
+from DBSSecrets import dbs3_p_i2
 
-db_mapping = {'dev/global': dbs3_p1_i2,
-              'dev/phys03': dbs3_l_i2}
+db_mapping = {'dev/global': dbs3_l2_i2,
+              'dev/phys03': dbs3_p_i2}
 
-thread_mapping = {'dev/global': 1,
-                  'dev/phys03': 1}
+thread_mapping = {'dev/global': 5,
+                  'dev/phys03': 5}
 
 def create_instance_config(db_instances, instance_name):
     db_config_section = db_instances.section_(instance_name)
