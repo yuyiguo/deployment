@@ -42,8 +42,15 @@ privauthdir=
 release=
 
 case $(uname) in
-  Darwin ) arch=osx106_amd64_gcc461 xargsr="xargs" ;;
-  Linux  ) arch=slc$(lsb_release -rs|cut -d. -f1)_amd64_gcc461 xargsr="xargs -r" ;;
+  Darwin ) arch=osx108_amd64_gcc481 xargsr="xargs" ;;
+  Linux  ) linuxmajor=$(egrep -o 'release [0-9]+{1}\.' /etc/redhat-release|cut -d" " -f2|tr -d .)
+           if [ $linuxmajor = 5 ]; then
+             arch=slc5_amd64_gcc461
+           else
+             arch=slc${linuxmajor}_amd64_gcc481
+           fi
+           xargsr="xargs -r"
+           ;;
   *      ) echo "unsupported architecture" 1>&2; exit 1 ;;
 esac
 
@@ -127,23 +134,21 @@ fi
 # Set group if we are running in multi-account mode.
 setgroup()
 {
-  if $nogroups; then :; else
-    local opts=
-    local priv=
-    local group=
+  local opts=
+  local priv=
+  local group=
 
-    while [ $# -ge 1 ]; do
-      case $1 in -*) opts="$opts $1"; shift ;; *) break;; esac
-    done
+  while [ $# -ge 1 ]; do
+    case $1 in -*) opts="$opts $1"; shift ;; *) break;; esac
+  done
 
-    local priv=$1
-    local group=$2
-    shift; shift
+  local priv=$1
+  local group=$2
+  shift; shift
 
-    if [ $# -ge 1 ]; then
-      chgrp $opts $group ${1+"$@"}
-      chmod $opts $priv ${1+"$@"}
-    fi
+  if [ $# -ge 1 ]; then
+    $nogroups || chgrp $opts $group ${1+"$@"}
+    chmod $opts $priv ${1+"$@"}
   fi
 }
 

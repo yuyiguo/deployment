@@ -34,7 +34,7 @@ deploy_frontend_sw()
       opts="-DTEST" name=""
       backends=backends-dev.txt ;;
   esac
-  if $nogroups; then user=; else user="-u _frontend:_frontend"; fi
+  if $nogroups; then user="-u $(id -un):$(id -gn)"; else user="-u _frontend:_frontend"; fi
 
   (. $root/current/apps/frontend/etc/profile.d/init.sh
    export AUTH_JSON_MAP=$PWD/etc/authmap.json
@@ -64,12 +64,12 @@ deploy_frontend_sw()
 deploy_frontend_post()
 {
   local certs
-  if [ -r /etc/grid-security/hostkey.pem ]; then
-    certs=/etc/grid-security
-  elif [ -r $root/certs/hostkey.pem ]; then
+  if [ -r $root/certs/hostkey.pem ]; then
     certs=$root/certs
   elif [ -r /data/certs/hostkey.pem ]; then
     certs=/data/certs
+  elif [ -r /etc/grid-security/hostkey.pem ]; then
+    certs=/etc/grid-security
   else
     note "ERROR: cannot find hostcert/key to use"
     exit 1
@@ -97,9 +97,11 @@ deploy_frontend_post()
         "PYTHONPATH=$project_auth:\$PYTHONPATH $project_config/mkauthmap" \
         "$silent -c sitedbread.db -o $PWD/etc/authmap.json"
    case $host in
-     vocms135 | vocms162 ) ;;
-     vocms160 ) echo "23 */6 * * * $project_config/update-keys $PWD vocms162" ;;
+     vocms135 | vocms162 | vocms0135 | vocms0162 ) ;;
+     vocms160  ) echo "23 */6 * * * $project_config/update-keys $PWD vocms162" ;;
+     vocms0160 ) echo "23 */6 * * * $project_config/update-keys $PWD vocms0162" ;;
      vocms134 ) echo "23 */6 * * * $project_config/update-keys $PWD vocms135" ;;
+     vocms0134 ) echo "23 */6 * * * $project_config/update-keys $PWD vocms0135" ;;
      *)        echo "23 */6 * * * $project_config/update-keys $PWD" ;;
    esac) | crontab -
 

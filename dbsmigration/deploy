@@ -24,16 +24,16 @@ deploy_dbsmigration_sw()
 
 deploy_dbsmigration_post()
 {
-  case $host in vocms13[89] | vocms140 ) disable ;; * ) enable ;; esac
+  case $host in vocms13[89] | vocms140 | vocms0128 | vocms013[89] | vocms0140 ) disable ;; * ) enable ;; esac
 
   (mkcrontab
    sysboot
    case $host in
-     vocms13[89] | vocms140 )
+     vocms13[89] | vocms140 | vocms0128 | vocms013[89] | vocms0140 )
        ;;
      * )
        local cmd="$project_config/manage setinstances 'I did read documentation'"
-       $nogroups || cmd="sudo -H -u _dbsmigration bashs -l -c \"${cmd}\""
+       $nogroups || cmd="sudo -H -u _dbsmigration bashs -l -c \"${cmd}\" 2> /dev/null"
        echo "*/30 * * * * $cmd"
        [ -f $project_state/view_instances.json ] ||
          { cp {$root/current/apps/dbsmigration,$project_state}/view_instances.json;

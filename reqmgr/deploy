@@ -10,7 +10,8 @@ deploy_reqmgr_deps()
       deploy couchdb offsite
       deploy wmcore ;;
     * )
-      deploy couchdb ;;
+      deploy couchdb
+      deploy bigcouch ;;
   esac
   deploy reqmon
   deploy acdcserver
@@ -63,35 +64,28 @@ deploy_reqmgr_sw()
 
 deploy_reqmgr_post()
 {
-  case $host in vocms13[89] ) disable ;; * ) enable ;; esac
+  case $host in vocms13[89] | vocms013[89] ) disable ;; * ) enable ;; esac
 
   case $variant in
     offsite )
       ;;
     * )
-      # Tell couchdb to pick up reqmgr on the next restart
-      local couchdb_config=$root/current/config/couchdb
-      local couchdb_state=$root/state/couchdb
+      # Tell couch to pick up reqmgr on the next restart
       local reqmgrapp=$root/current/apps/reqmgr
-
-      for area in stagingarea replication; do
-        rm -f $couchdb_state/$area/reqmgr
-        touch $couchdb_state/$area/reqmgr
+      for couch in couchdb:5984 bigcouch:5985; do
+        echo "couchapp push $reqmgrapp/data/couchapps/ReqMgr" \
+             "http://localhost:${couch##*:}/reqmgr_workload_cache" \
+          > $root/state/${couch%%:*}/stagingarea/reqmgr
+        echo "couchapp push $reqmgrapp/data/couchapps/ConfigCache" \
+             "http://localhost:${couch##*:}/reqmgr_config_cache" \
+          >> $root/state/${couch%%:*}/stagingarea/reqmgr
       done
-
-      echo "couchapp push $reqmgrapp/data/couchapps/ReqMgr" \
-           "http://localhost:5984/reqmgr_workload_cache" \
-        >> $couchdb_state/stagingarea/reqmgr
-      echo "couchapp push $reqmgrapp/data/couchapps/ConfigCache" \
-           "http://localhost:5984/reqmgr_config_cache" \
-        >> $couchdb_state/stagingarea/reqmgr
-      $MIGRATION rm -rf $couchdb_state/database/{\.,}ops_clipboard*
 
       # Setup ReqMgr cronjobs
       (mkcrontab
        sysboot
        case $host in
-         vocms34 | vocms13[2689] | vocms16[13] ) ;;
+         vocms34 | vocms13[2689] | vocms16[13] | vocms034 | vocms0128 | vocms013[2689] | vocms016[13] ) ;;
 	 * )
            local cmd="$project_config/manage updateversions 'I did read documentation'"
            $nogroups || cmd="sudo -H -u _reqmgr bashs -l -c \"${cmd}\""

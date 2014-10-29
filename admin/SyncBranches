@@ -1,0 +1,80 @@
+#!/bin/bash
+
+### Synchronizes two branches by interactively asking for commits
+### to cherry-pick since a given (non-inclusive) starting git reference.
+###
+### Usage: SyncBranches -h
+### Usage:
+### Usage: SyncBranches [-p] -s <src-branch> -d <dst-branch> <since-tag-or-commit>
+### Usage:     -p: do not pick anything, just print what is missing
+### Usage:     -s <src-branch> or -d <dst-branch>: note that branch names can
+### Usage:         be remote names. To use local branches, you must have
+### Usage:         checked them out first. Remote dest branches can only be
+### Usage:         used for printing the differences.
+### Usage:
+### Usage: Examples: SyncBranches -s remotes/origin/comp -d comp_gcc481 HG1406f
+### Usage:           SyncBranches -p -s remotes/origin/comp -d remotes/origin/comp_gcc481 remotes/origin/comp~20
+
+usage()
+{
+  perl -ne '/^### Usage:/ && do { s/^### ?//; print }' < $0
+  exit 1
+}
+
+help()
+{
+  perl -ne '/^###/ && do { s/^### ?//; print }' < $0
+  exit 0
+}
+
+p=
+for arg; do
+  case $arg in
+    -h) help ;;
+    -p) p=true; shift;;
+    -s) srcbranch=$2; shift; shift ;;
+    -d) dstbranch=$2; shift; shift ;;
+    -*) usage ;;
+  esac
+done
+start=$1
+[ $# = 1 ] || { usage; exit 1; }
+
+# check the repo has been cloned
+if ! git log -1 &> /dev/null; then
+  echo "Could not find a repository in the current directory. Clone it first."
+  exit 1
+fi
+
+# check start tag/commit exists on src branch
+if ! git branch -a --contains $start 2>/dev/null | egrep -q " $srcbranch\$"; then
+  echo "Could not find starting tag or commit $start on $srcbranch."
+  exit 1
+fi
+
+# when not in print-only mode, check the dest branch is local and we are there
+if [ -z "$p" ]; then
+  if [ "${dstbranch:0:8}" = "remotes/" ]; then
+    echo "Cannot use a remote branch as destine for checky-picking.";
+    exit 1
+  fi
+  if [ $(git rev-parse --abbrev-ref HEAD) != $dstbranch ]; then
+    echo "You must git-checkout the local $dstbranch branch first."
+    exit 1
+  fi
+fi
+
+for cmt in $(git rev-list --topo-order $start..$srcbranch --reverse); do
+  msg=$(git show -s --oneline $cmt|cut -d" " -f2-)
+  printf "%s %70s" "(${cmt:0:7})" "$msg"
+  if git log -s --oneline -50 $dstbranch | grep -q "$msg"; then
+    printf "%8s%18s\n" "" "[ALREADY PICKED]"
+  else
+    printf "%8s" "$($p echo -n '? (y/n)')"
+    $p read -s answer
+    case $answer in
+      y) printf "%18s\n" "[    PICKING...]"; git cherry-pick $cmt || break;;
+      *) printf "%18s\n" "[    NOT PICKED]";;
+    esac;
+  fi
+done

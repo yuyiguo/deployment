@@ -4,9 +4,11 @@ Everything configurable in ReqMgr is defined here.
 
 """
 
-
+import socket
 from WMCore.Configuration import Configuration
 from os import path
+
+HOST = socket.gethostname().lower()
 
 config = Configuration()
 
@@ -49,6 +51,7 @@ data.couch_reqmgr_aux_db = "reqmgr_auxiliary"
 data.couch_config_cache_db = "reqmgr_config_cache"
 data.couch_workload_summary_db = "workloadsummary"
 data.couch_wmstats_db = "wmstats"
+data.couch_wmdatamining_db = "wmdatamining"
 # number of past days since when to display requests in the default view
 data.default_view_requests_since_num_days = 30 # days
 # resource to fetch CMS software versions and scramarch info from
@@ -70,3 +73,28 @@ ui.static_content_dir = path.join(path.abspath(__file__.rsplit('/', 3)[0]),
                                  "apps",
                                  main.application,
                                  "data")
+
+if  HOST.startswith("vocms034"):
+    extentions = config.section_("extensions")
+    wmdatamining = extentions.section_("wmdatamining")
+    wmdatamining.object = "WMCore.ReqMgr.CherryPyThreads.WMDataMining.WMDataMining"
+    wmdatamining.wmstats_url = "https://cmsweb.cern.ch/couchdb/wmstats"
+    wmdatamining.reqmgrdb_url = "https://cmsweb.cern.ch/couchdb/reqmgr_workload_cache"
+    #wmdatamining.wmstats_url = "%s/%s" % (data.couch_host, data.couch_wmstats_db)
+    #wmdatamining.reqmgrdb_url = "%s/%s" % (data.couch_host, data.couch_reqmgr_db)
+    wmdatamining.wmdatamining_url = "%s/%s" % (data.couch_host, data.couch_wmdatamining_db)
+    wmdatamining.activeDuration = 60 * 15  # every 15 min
+    wmdatamining.archiveDuration = 60 * 60 * 24 # every 24 hours
+
+#  for dev and vm use testbed data
+if  HOST.startswith("vocms0127"):
+    extentions = config.section_("extensions")
+    wmdatamining = extentions.section_("wmdatamining")
+    wmdatamining.object = "WMCore.ReqMgr.CherryPyThreads.WMDataMining.WMDataMining"
+    wmdatamining.wmstats_url = "https://cmsweb-testbed.cern.ch/couchdb/wmstats"
+    wmdatamining.reqmgrdb_url = "https://cmsweb-testbed.cern.ch/couchdb/reqmgr_workload_cache"
+    #wmdatamining.wmstats_url = "%s/%s" % (data.couch_host, data.couch_wmstats_db)
+    #wmdatamining.reqmgrdb_url = "%s/%s" % (data.couch_host, data.couch_reqmgr_db)
+    wmdatamining.wmdatamining_url = "%s/%s" % (data.couch_host, data.couch_wmdatamining_db)
+    wmdatamining.activeDuration = 60 * 15  # every 15 mins
+    wmdatamining.archiveDuration = 60 * 60 * 24 # every 24 hours
