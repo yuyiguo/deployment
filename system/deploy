@@ -3,6 +3,19 @@ deploy_system_variants="frontend backend image devvm devmac"
 system_arch=$(uname)
 : ${CMS_DEV_ROOT:=/data}
 
+# Ask for confirmation
+confirm()
+{
+  key=$(perl -e 'print map{chr(1+32*(2+int(rand(2)))+int(rand(26)))} 0..9')
+  echo; echo "********************************************"
+  echo -n "*** $1? if yes, say [$key]: "
+  read answer
+  case $answer in
+    $key ) true ;;
+    * ) exit 2 ;;
+  esac
+}
+
 # Add a local group if it doesn't already exist.
 add_local_group()
 {
@@ -287,25 +300,9 @@ deploy_system_post()
       [ $HOME = /home/cmsweb ]
       cd $HOME
 
-      # Make sure we have a valid /data partition first.
-      $project_config_src/make-data-partition
-
       # Verify system installation is up-to-date; should do nothing.
-      # If we re-created /data above, this fills it correctly.
-      sudo /usr/sbin/ccm-fetch
-      sudo /usr/sbin/spma_wrapper.sh
-      sudo /usr/sbin/ncm-ncd --configure --all || true # fails for useraccess (slsmon)
-
-      # Verify the user has required local groups.
-      G=$(id -Gn)
-      for g in _config _sw _auth _frontend _admin _base _couchdb _das _dbs \
-               _dqmgui _filemover _overview _phedex _sitedb _t0mon \
-               _mongodb _reqmgr _workqueue _configcache _t0datasvc _reqmon \
-               _crabserver _crabcache _dmwmmon _an_reqmgr _an_workqueue \
-               _an_reqmon _t0wmadatasvc _dbsmigration _t0_reqmon _reqmgr2 \
-               _acdcserver _gitweb _bigcouch; do
-        case " $G " in *" $g "* ) ;; * ) note "ERROR: no $g group"; exit 1;; esac
-      done
+      sudo sh -c '/usr/bin/puppet agent -t' ||
+        note "WARNING: puppet agent exited with code $?."
 
       # Must have various directories.
       [ -d /data/user ]
@@ -313,43 +310,12 @@ deploy_system_post()
       [ -d /data/empty ]
 
       # Must have AFS token and be able to sudo.
-      /usr/kerberos/bin/klist -s
+      /usr/bin/klist -s
       sudo -l
 
       # Fetch CRLs
-      sudo sh -c '/usr/sbin/fetch-crl3' ||
+      sudo sh -c '/usr/sbin/fetch-crl' ||
           note "WARNING: CRL update failed with exit code $? (probably harmless)."
- 
-      # Verify the host certificate is ok.
-      note "INFO: cert subject:    " $(openssl x509 -noout -in /etc/grid-security/hostcert.pem -subject)
-      note "INFO: cert fingerprint:" $(openssl x509 -noout -in /etc/grid-security/hostcert.pem -fingerprint)
-      note "INFO: cert validity:   " $(openssl x509 -noout -in /etc/grid-security/hostcert.pem -dates)
-
-      openssl verify -CApath /etc/grid-security/certificates /etc/grid-security/hostcert.pem
-      openssl x509 -noout -in /etc/grid-security/hostcert.pem -days 180 ||
-        { note "ERROR: cert must be valid for at least 180 days"; exit 1; }
-      X=$(echo -n "this is a test" |
-          openssl smime -encrypt -aes128 /etc/grid-security/hostcert.pem | \
-          sudo openssl smime -decrypt -inkey /etc/grid-security/host{key,cert}.pem)
-      case $X in "this is a test" ) ;; * )
-        note "ERROR: cert and key do not match"; exit 1;;
-      esac
-
-      X=$(openssl x509 -noout -in /etc/grid-security/hostcert.pem -subject)
-      case $variant:$X in
-        frontend:"subject= /DC=ch/DC=cern/OU=computers/CN=cmsweb.cern.ch" | \
-        frontend:"subject= /DC=ch/DC=cern/OU=computers/CN=cmsweb-testbed.cern.ch" | \
-        frontend:"subject= /DC=ch/DC=cern/OU=computers/CN=cmsweb-dev.cern.ch" | \
-         backend:"subject= /DC=ch/DC=cern/OU=computers/CN=cmsweb-dev.cern.ch" | \
-         backend:"subject= /DC=ch/DC=cern/OU=computers/CN=vocms"[0-9][0-9]".cern.ch" | \
-         backend:"subject= /DC=ch/DC=cern/OU=computers/CN=vocms"[0-9][0-9][0-9]".cern.ch" | \
-           image:"subject= /DC=ch/DC=cern/OU=computers/CN=vocms"[0-9][0-9]".cern.ch" | \
-           image:"subject= /DC=ch/DC=cern/OU=computers/CN=vocms"[0-9][0-9][0-9]".cern.ch" )
-          ;;
-        * )
-          note "ERROR: cert subject invalid for $variant: $X"
-          exit 1 ;;
-      esac
 
       # Install logwatch / bashs scanner and patch sendmail scanner.
       (cd $project_config_src/logwatch; find . -type f -print0 |
@@ -362,36 +328,39 @@ deploy_system_post()
         < $project_config_src/logwatch-sendmail.patch
       sudo mv /etc/cron.daily/0logwatch /etc/cron.weekly/ || true
 
-      # Make sure the permissions for /home/cmsweb are right.
-      sudo /usr/sbin/ncm-ncd --configure dirperm
-
-      # Setup bash. Set environment on login. Destroy token on logout.
-      (echo '[ -f ~/.bashrc ] && . ~/.bashrc') > .bash_profile
-      (echo unlog; echo kdestroy; echo 'rm -f /tmp/{krb5cc_,tkt}$(id -u){,_*}') > .bash_logout
-      (echo '[ -f /etc/bashrc ] && . /etc/bashrc';
-       echo 'export PATH=$HOME/bin:/data/srv/current/bin:$PATH') > .bashrc
-
-      # Set up SSH keys.
       case $variant in
         frontend | backend )
-          mkdir -p .ssh
-          cp -p /afs/cern.ch/user/c/cmsweb/private/admin/ssh-keys-$variant .ssh/authorized_keys
+          # Verify the host certificate is ok.
+          note "INFO: cert subject:    " $(openssl x509 -noout -in /data/certs/hostcert.pem -subject)
+          note "INFO: cert fingerprint:" $(openssl x509 -noout -in /data/certs/hostcert.pem -fingerprint)
+          note "INFO: cert validity:   " $(openssl x509 -noout -in /data/certs/hostcert.pem -dates)
+
+          openssl verify -CApath /etc/grid-security/certificates /data/certs/hostcert.pem
+          openssl x509 -noout -in /data/certs/hostcert.pem -days 180 ||
+            { note "ERROR: cert must be valid for at least 180 days"; exit 1; }
+          X=$(echo -n "this is a test" |
+              openssl smime -encrypt -aes128 /data/certs/hostcert.pem | \
+              sudo openssl smime -decrypt -inkey /data/certs/host{key,cert}.pem)
+          case $X in "this is a test" ) ;; * )
+            note "ERROR: cert and key do not match"; exit 1;;
+          esac
+
+          # FIXME: check if the certificates are correct, specially the aliased ones 
+
+          # Set up SSH keys.
           cp -p /afs/cern.ch/user/c/cmsweb/private/admin/id_dsa_$variant .ssh/id_dsa
           cp -p /afs/cern.ch/user/c/cmsweb/private/admin/id_dsa_$variant.pub .ssh/id_dsa.pub
-          chmod -R go-rwx /home/cmsweb/.ssh
+          chmod go-rwx /home/cmsweb/.ssh/id_dsa /home/cmsweb/.ssh/id_dsa.pub
           ;;
 
         image )
-          sudo mkdir -p /root/.ssh
-          sudo chmod 700 /root/.ssh
           sudo cp /afs/cern.ch/user/c/cmsweb/private/admin/id_dsa_$variant /root/.ssh/id_dsa
           sudo cp /afs/cern.ch/user/c/cmsweb/private/admin/id_dsa_$variant.pub /root/.ssh/id_dsa.pub
-          sudo chmod 600 /root/.ssh/id_dsa
-          sudo chmod 600 /root/.ssh/id_dsa.pub
+          sudo chmod go-rwx /root/.ssh/id_dsa /root/.ssh/id_dsa.pub
 
           note "IMPORTANT: run the following to update /root/.ssh/known_hosts"
           note "   sudo cfg/admin/ImageKey start"
-          note "   for h in vocms{34,127,13{2,3,4,5,6,8,9},140,16{0,1,2,3}}{,.cern.ch}; do"
+          note "   for h in vocms{0,}{30{6,7},34,12{7,8},13{2,3,4,5,6,8,9},140,16{0,1,2,3}}{,.cern.ch}; do"
           note "     echo \$h; sudo cfg/admin/ImageKey run ssh cmsweb@\$h uptime"
           note "   done"
           note "   sudo cfg/admin/ImageKey stop"
@@ -434,6 +403,7 @@ deploy_system_post()
 
     devvm )
       MYGROUP=$(id -gn)
+      PATH=$PATH:/sbin:/usr/sbin
 
       # Fix /etc/sudoers. We can't have 'requiretty' as we need crontab
       # to sudo to service accounts, and we need NOPASSWD so that user
@@ -454,6 +424,7 @@ deploy_system_post()
         http://cern.ch/grid-deployment/glite/repos/3.2/glite-SCAS.repo
 
       # Install additional required packages.
+      note "INFO: installing required system packages. This operation may take a few minutes complete."
       sudo yum -y install \
         tk compat-libstdc++-33 'ca_*' dummy-ca-certs lcg-CA \
 	fetch-crl edg-mkgridmap git-all stgit colordiff libXpm-devel finger \
@@ -486,6 +457,46 @@ deploy_system_post()
       sudo /sbin/iptables -I $fwchain 5 -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
       sudo /sbin/iptables -I $fwchain 6 -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
       sudo sh -c '/sbin/iptables-save > /etc/sysconfig/iptables'
+
+      # Default SLC5/6 installations don't use the whole ephemeral disk
+      # available. Try expanding them automatically.
+      vgroup='VolGroup00' lvolume='LogVol00'
+      if [ X"$(mount |grep $vgroup-$lvolume|awk '{ print $3 }')" = X'/' ]; then
+        note "INFO: default SLC5/6 image detected. Checking if there is unallocated disk space we could use..."
+        # Detect if there is free space at the end of the disk
+        free=$(($(sudo parted -s /dev/vda -- unit B print free|grep 'Free Space' |tail -n1|awk '{ print $3 }' |tr -d 'B')))
+        if [ $free -ge 1000000000 ]; then
+          note "INFO: can resize '/' to increase in $((free / 1000000)) MB. Proceed? (y/n) "
+          read answer
+          case $answer in
+            y )
+              note "INFO: starting to resize. This operation may take a long time to complete. Please wait."
+              # guess the last partition number
+              partno=$(($(sudo fdisk -l /dev/vda |grep '/dev/vda'|tail -n1| awk '{ print $1 }' | egrep -o '[0-9]+')))
+              if [ $partno -gt 0 -a $partno -lt 4 ]; then
+                newpart=$(($partno + 1))
+                # Create a LVM partition, ignore sync failure
+                echo -e "c\np\nn\np\n${newpart}\n\n\nt\n${newpart}\n8e\nw\n" | sudo fdisk /dev/vda || true
+                # Force re-sync
+                sudo partx -a /dev/vda 2> /dev/null # can ignore errors
+                # Increase the size of the logical volume
+                sudo pvcreate /dev/vda$newpart
+                sudo vgextend $vgroup /dev/vda$newpart
+                sudo lvextend /dev/$vgroup/$lvolume /dev/vda$newpart
+                sudo resize2fs /dev/$vgroup/$lvolume
+                note "INFO: partition resizing operation completed successfully."
+              else
+                note "ERROR: not possible to create another primary partition. Ignoring resizing."
+              fi
+              ;;
+            * )
+              note "INFO: keeping disk partition setup as it is."
+              ;;
+          esac
+        else
+          note "INFO: machine already using all the ephemeral vm storage space allocated to it."
+        fi
+      fi
 
       # Create groups and accounts.
       system_groups_and_accounts

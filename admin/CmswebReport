@@ -31,7 +31,7 @@ couchstats() {
     # Check DB size exceeds threshold
     dbsize=$(ls -alF /data/srv/state/couchdb/database/$dbname.couch|cut -d" " -f5)
     [ $dbsize -le ${DB_THRESHOLD} ] ||
-      echo "WARNING: $host:$name size is $(bc<<<scale=2\;$dbsize/$GB) GB. Consider reducing it." 1>&2
+      echo "WARNING: $host:$dbname size is $(bc<<<scale=2\;$dbsize/$GB) GB. Consider reducing it." 1>&2
 
     # Check views size exceeds threshold
     viewsizes=$(ls -alF /data/srv/state/couchdb/database/.${dbname}_design/*view|cut -d" " -f5)
@@ -67,14 +67,14 @@ variant=$1
 
 case $variant in
   prod)
-    frontends="vocms160,vocms162"
-    backends="vocms34,vocms136,vocms138,vocms139,vocms140,vocms161,vocms163"
-    couches="vocms138,vocms140"
+    frontends="vocms0160,vocms0162"
+    backends="vocms034,vocms0136,vocms138,vocms139,vocms0140,vocms0161,vocms0163,vocms0306,vocms0307"
+    couches="vocms0306,vocms0307,vocms0140"
     ;;
   preprod|dev)
-    frontends="vocms127,vocms134,vocms135"
-    backends="vocms127,vocms132,vocms133"
-    couches="vocms127,vocms132,vocms133"
+    frontends="vocms0127,vocms0134,vocms0135"
+    backends="vocms0127,vocms0132,vocms0133"
+    couches="vocms0127,vocms0132,vocms0133"
     ;;
   *)
     usage
@@ -85,7 +85,7 @@ esac
 BASEDIR=$(cd $(dirname $0) && pwd)
 
 # Report starts here
-echo "###### Begin of CMSWEB $variant report on $(date) ######"
+echo "###### Begin of CMSWEB $variant report ######"
 echo
 
 # CouchDB
@@ -95,7 +95,7 @@ printf "%14s %10s %25s %12s %12s %12s %12s\n" \
        "TOTAL SIZE(MB)" "HOST" "DB NAME" "DB SIZE" "VIEWS SIZE" "DOCS" "DELETED"
 echo "-------------------------------------------------------------------------------------------------------"
 for h in ${couches//,/ }; do
-  ssh $h "bashs -lc '$(declare -f couchstats); couchstats $h'"
+  ssh -i $HOME/.ssh/id_dsa_backend $h "bashs -lc '$(declare -f couchstats); couchstats $h'"
 done  | sort -n -r
 echo
 echo "#### End of CouchDB report ####"
@@ -128,7 +128,7 @@ printf "%13s %20s" "TOTAL(MB)" "Service"
 for h in ${backends//,/ }; do printf "%20s" $h; done; echo
 printf '%.0s-' {1..34}; for h in ${backends//,/ }; do printf '%.0s-' {1..20}; done; echo
 du=`for h in ${backends//,/ }; do
-  ssh $h "sudo bashs -lc 'du -sb /data/srv/state/*'" | while read usedspace srv; do echo $usedspace ${srv##*/} $h; done
+  ssh -i $HOME/.ssh/id_dsa_backend $h "sudo bashs -lc 'du -sb /data/srv/state/*'" | while read usedspace srv; do echo $usedspace ${srv##*/} $h; done
 done | sort -nr`
 for svc in $(echo "$du" | cut -d" " -f2|sort -u); do
   svctot=$(echo "$du" | grep " $svc " | awk '{s+=$1}END{print s}')
@@ -143,7 +143,7 @@ echo
 # Check used disk partitions space on machines exceed threshold and notifies
 USED_THRESHOLD=85  # in %
 for h in ${backends//,/ }; do
-  ssh $h "bashs -lc 'df'" | awk '{ print $5, $6}' | grep -v "Use" | \
+  ssh -i $HOME/.ssh/id_dsa_backend $h "bashs -lc 'df -P -t ext4 -t xfs'" | awk '{ print $5, $6}' | grep -v "Capacity" | \
     while read used mounted; do
       [ ${used%\%} -gt ${USED_THRESHOLD} ] &&
         echo "WARNING: $mounted on $h is $used filled up." 1>&2

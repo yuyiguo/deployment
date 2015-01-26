@@ -35,7 +35,7 @@ deploy_admin_post()
 
   local pxlabel pxskip certs
   case $host in
-    vocms34 | vocms127 | vocms13[2345689] | vocms140 | vocms16[0123] )
+    vocms34 | vocms034 |  vocms127 |  vocms012[78] | vocms13[2345689] | vocms013[2345689] | vocms140 | vocms0140 | vocms16[0123] | vocms016[0123] | vocms030[67] )
       pxlabel=cmsweb_backends ;;
     * )
       pxlabel=devvm_$(echo $host | tr - _) ;;
@@ -65,12 +65,14 @@ deploy_admin_post()
 
   case $host:$root in
     vocms127:/data/srv | vocms134:/data/srv | vocms135:/data/srv | \
-    vocms160:/data/srv | vocms162:/data/srv )
+    vocms160:/data/srv | vocms162:/data/srv | \
+    vocms0127:/data/srv | vocms0134:/data/srv | vocms0135:/data/srv | \
+    vocms0160:/data/srv | vocms0162:/data/srv)
       klist -s # must have afs kerberos token
       LOGDIR=/afs/cern.ch/cms/cmsweb/log-archive
       (acrontab -l | { fgrep -v -e " $host $project_config/" || true; } | \
         { grep -v " $host .*/archive-log-files" || true; }
-       echo "27 * * * * $host $project_config/LogSave $root $LOGDIR/$host") | acrontab
+       echo "27 */3 * * * $host $project_config/LogSave $root $LOGDIR/$host") | acrontab
       acrontab -l | fgrep " $host $project_config/" | sed "s|^[/*0-9 ]* $host ||" | sh -x
       ;;
   esac
