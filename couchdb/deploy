@@ -3,8 +3,8 @@ deploy_couchdb_variants="default offsite"
 
 deploy_couchdb_deps()
 {
-  deploy backend
-  deploy wmcore-auth
+  deploy $stage backend
+  deploy $stage wmcore-auth
 }
 
 deploy_couchdb_prep()
@@ -15,15 +15,16 @@ deploy_couchdb_prep()
 
 deploy_couchdb_sw()
 {
-  rm -f $project_auth/hmackey.ini
-  deploy_pkg -a couchdb/hmackey.ini comp external+couchdb
-  perl -p -i -e "s|{ROOT}|$root|g" $project_config/local.ini
+  $authlink || rm -f $project_auth/hmackey.ini
 
   case $variant in
     default )
+      deploy_pkg -l couchdb -a couchdb/hmackey.ini comp external+couchdb15
+      $authlink || setgroup ug+rx,o-rwx _config $project_auth/hmackey.ini
       ;;
     * )
-      perl -p -i -e "s|bind_address = 0.0.0.0|bind_address = 127.0.0.1|g" $project_config/local.ini
+      deploy_pkg -a couchdb/hmackey.ini comp external+couchdb
+      perl -p -i -e "s|bind_address = 0.0.0.0|bind_address = 127.0.0.1|g" $root/$cfgversion/config/$project/local.ini
       (echo
        echo "[ssl]"
        echo "cert_file = $project_state/proxy/proxy.cert"
@@ -32,16 +33,17 @@ deploy_couchdb_sw()
        echo
        echo "[replicator]"
        echo "max_replication_retry_count = infinity"
-      ) >> $project_config/local.ini
+      ) >> $root/$cfgversion/config/$project/local.ini
       ;;
   esac
+  perl -p -i -e "s|{ROOT}|$root|g" $root/$cfgversion/config/$project/local.ini
 }
 
 deploy_couchdb_post()
 {
   (mkcrontab
    case $host in
-      vocms34 | vocms13[69] | vocms16[13] | vocms034 | vocms013[689] | vocms016[13] )
+     vocms013[689] | vocms016[135] )
        disable ;;
      * )
        enable
@@ -57,28 +59,23 @@ deploy_couchdb_post()
 
        # Daily backup the databases to other cluster machines
        case $host in
-         vocms140 ) tohost=vocms138;;
-         vocms138 ) tohost=vocms140;;
-         vocms132 ) tohost=vocms133;;
-         vocms133 ) tohost=vocms132;;
-         vocms127 ) tohost=vocms127;;
-         vocms0140 ) tohost=vocms0128;;
-         vocms0128 ) tohost=vocms0140;;
-         vocms0132 ) tohost=vocms0133;;
-         vocms0133 ) tohost=vocms0132;;
-         vocms0127 ) tohost=vocms0127;;
-         vocms0306 ) tohost=vocms0307;;
-         vocms0307 ) tohost=vocms0306;;
+         vocms0126 ) tohost=vocms0126 hour=1;;
+         vocms0127 ) tohost=vocms0127 hour=1;;
+         vocms0132 ) tohost=vocms0131 hour=1;;
+         vocms0131 ) tohost=vocms0132 hour=2;;
+         vocms0140 ) tohost=vocms0131 hour=3;;
+         vocms0306 | vocms0318 ) tohost=vocms0140 hour=4;;
+         vocms0307 ) tohost=vocms0140 hour=5;;
                 * ) tohost=;;
        esac
        [ -z "$tohost" ] ||
-         echo "#0 21 * * * $project_config/manage backup $tohost:$project_state/backup/$host 'I did read documentation'"
+         echo "0 $hour * * * $project_config/manage backup $tohost:$project_state/backup/$host 'I did read documentation'"
        ;;
    esac) | crontab -
 
   # Weekly archive backups to castor
   case $host in
-    vocms140 | vocms138 | vocms13[23] | vocms127 | vocms0140 | vocms0128 | vocms0306 | vocms0307 | vocms013[23] | vocms0127 )
+    vocms0140 | vocms0306 | vocms0307 | vocms0318 | vocms013[123] | vocms0127 | vocms0126)
       klist -s # must have afs kerberos token
       (acrontab -l | { fgrep -v -e " $host $project_config/" || true; }
        echo "#30 4 * * 0 $host $project_config/manage archive /castor/cern.ch/cms/archive/cmsweb/backups 'I did read documentation'") | acrontab
@@ -93,5 +90,5 @@ deploy_couchdb_auth()
   perl -e \
     'undef $/; print "[couch_cms_auth]\n";
      print "hmac_secret = ", unpack("h*", <STDIN>), "\n"' < \
-    $root/current/auth/wmcore-auth/header-auth-key
+    $root/$cfgversion/auth/wmcore-auth/header-auth-key
 }

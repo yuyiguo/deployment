@@ -1,7 +1,7 @@
 import os.path, socket; global CONFIGDIR
 from glob import glob
 CONFIGDIR = os.path.normcase(os.path.abspath(__file__)).rsplit('/', 1)[0]
-BASEDIR   = CONFIGDIR.replace("/current/config/dqmgui", "")
+BASEDIR   = __file__.rsplit('/', 4)[0]
 STATEDIR  = "%s/state/dqmgui/relval" % BASEDIR
 LOGDIR    = "%s/logs/dqmgui/relval" % BASEDIR
 
@@ -14,6 +14,7 @@ LAYOUTS += glob("%s/layouts/%smc_relval-layouts.py" % (CONFIGDIR, "pflow"))
 LAYOUTS += glob("%s/layouts/%s_relval-layouts.py" % (CONFIGDIR, "hlt"))
 LAYOUTS += glob("%s/layouts/%s_relval-layouts.py" % (CONFIGDIR, "ecal"))
 LAYOUTS += glob("%s/layouts/%s_relval-layouts.py" % (CONFIGDIR, "tk"))
+LAYOUTS += glob("%s/layouts/%s_relval-layouts.py" % (CONFIGDIR, "smp"))
 
 modules = ("Monitoring.DQM.GUI",)
 
@@ -24,9 +25,21 @@ modules = ("Monitoring.DQM.GUI",)
 server.port        = 8081
 server.serverDir   = STATEDIR
 server.logFile     = '%s/weblog-%%Y%%m%%d.log' % LOGDIR
-server.baseUrl     = '/dqm/relval'
 server.title       = 'CMS data quality'
-server.serviceName = 'RelVal'
+# For convenience, we change the service name, depending on the server:
+hostname = socket.gethostname().lower().split('.')[0]
+# Relval production server
+if hostname == 'vocms0139':
+  server.serviceName = 'RelVal'
+  server.baseUrl     = '/dqm/relval'
+# Relval test server
+elif hostname == 'vocms0131':
+  server.serviceName = 'RelVal Test'
+  server.baseUrl     = '/dqm/relval-test'
+# Any local instance of the relval flavor
+else:
+  server.serviceName = 'RelVal Local'
+  server.baseUrl     = '/dqm/relval'
 
 server.plugin('render', "%s/style/*.cc" % CONFIGDIR)
 server.extend('DQMRenderLink', server.pathOfPlugin('render'))
@@ -42,15 +55,7 @@ server.extend('DQMLayoutAccess', None, STATEDIR,
 server.source('DQMUnknown')
 server.source('DQMOverlay')
 server.source('DQMStripChart')
-
-# Switch to use the new index schema only on vocms139. If users want
-# to test the relval server configuration on their local machine, they
-# are still able to do that using the old schema.
-
-if socket.gethostname().lower().split('.')[0] in ['vocms139','vocms0139']  :
-    server.source('DQMArchive', "%s/ix128" % STATEDIR, '^/Global/')
-else:
-    server.source('DQMArchive', "%s/ix" % STATEDIR, '^/Global/')
+server.source('DQMArchive', "%s/ix128" % STATEDIR, '^/Global/')
 server.source('DQMLayout')
 
 execfile(CONFIGDIR + "/dqm-services.py")

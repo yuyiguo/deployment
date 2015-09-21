@@ -41,8 +41,9 @@ server.workspace('DQMContent', 21, 'Calorimeter', 'Ecal', '^Ecal(|Barrel|Endcap)
 
 server.workspace('DQMContent', 22, 'Calorimeter', 'EcalPreshower', '^EcalPreshower/', '',
                 'EcalPreshower/Layouts/01-IntegritySummary-EcalPreshower',
-                'EcalPreshower/Layouts/02-OccupancySummary-EcalPreshower',
-                'EcalPreshower/Layouts/03-RechitEnergySummary-EcalPreshower')
+                'EcalPreshower/Layouts/02-GoodRechitOccupancySummary-EcalPreshower',
+                'EcalPreshower/Layouts/03-GoodRechitEnergySummary-EcalPreshower',
+                'EcalPreshower/Layouts/04-ESTimingTaskSummary-EcalPreshower')
 
 server.workspace('DQMContent', 23, 'Calorimeter', 'HCAL', '^Hcal/', '',
                  'Hcal/Layouts/01 HCAL Summaries',
@@ -88,8 +89,7 @@ server.workspace('DQMContent', 45, 'POG', 'Tracking', '^(Tracking|AlcaBeamMonito
                                   'Tracking/Layouts/01 - Tracking ReportSummary',
                                   'Tracking/Layouts/02 - Tracks (pp collisions)',
                  'Tracking/Layouts/03 - Tracks (Cosmic Tracking)',
-                 'Tracking/Layouts/05 - Number of Seeds (pp collisions)',
-                 'Tracking/Layouts/08 - Tracks (pp collisions) old layout'
+                 'Tracking/Layouts/05 - Number of Seeds (pp collisions)'
                                   )
 
 server.workspace('DQMContent', 46, 'POG', 'Tau', '^RecoTauV/', '',

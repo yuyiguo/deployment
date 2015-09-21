@@ -2,7 +2,7 @@
 
 deploy_ssb_deps()
 {
-  deploy admin
+  deploy $stage admin
 }
 
 deploy_ssb_prep()
@@ -20,7 +20,7 @@ deploy_ssb_sw()
 
   # Drop here only the needed scripts
   klist -s
-  cd $root/current/apps
+  cd $root/$cfgversion/apps.$glabel
   git clone https://:@git.cern.ch/kerberos/sitecomm $project
   cd $project
   git reset --hard $ssbver
@@ -28,7 +28,7 @@ deploy_ssb_sw()
 
   # Relocations
   perl -p -i -e "s,{OUTDIR},$outdir,g; \
-                 s,{VER},$ssbver,g;" $project_config/ssb_task
+                 s,{VER},$ssbver,g;" $root/$cfgversion/config/$project/ssb_task
 }
 
 deploy_ssb_post()
@@ -40,7 +40,7 @@ deploy_ssb_post()
 
   (mkcrontab
    echo "10 2 * * * $project_config/ssb_task siteavail"
-   echo "55 0 * * * $project_config/ssb_task hctest 24"
+   echo "55 1 * * * $project_config/ssb_task hctest 24"
    echo "55 * * * * $project_config/ssb_task hctest 6"
    echo "0 * * * * $project_config/ssb_task storage"
   ) | crontab -
