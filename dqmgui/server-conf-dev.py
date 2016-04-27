@@ -1,7 +1,7 @@
 import os.path, socket; global CONFIGDIR
 from glob import glob
 CONFIGDIR = os.path.normcase(os.path.abspath(__file__)).rsplit('/', 1)[0]
-BASEDIR   = CONFIGDIR.replace("/current/config/dqmgui", "")
+BASEDIR   = __file__.rsplit('/', 4)[0]
 STATEDIR  = "%s/state/dqmgui/dev" % BASEDIR
 LOGDIR    = "%s/logs/dqmgui/dev" % BASEDIR
 
@@ -33,14 +33,14 @@ server.extend('DQMFileAccess', "%s/auth/wmcore-auth/header-auth-key" % __file__.
                 "ZIP": "%s/zipped" % STATEDIR })
 server.extend('DQMLayoutAccess', None, STATEDIR,
               ['/DC=ch/DC=cern/OU=Organic Units/OU=Users/CN=rovere/CN=653292/CN=Marco Rovere',
-               '/DC=ch/DC=cern/OU=Organic Units/OU=Users/CN=erosales/CN=725205/CN=Edgar Eduardo Rosales Rosero',
-               '/DC=ch/DC=cern/OU=Organic Units/OU=Users/CN=batinkov/CN=739757/CN=Atanas Ivanov Batinkov' ])
+               '/DC=ch/DC=cern/OU=Organic Units/OU=Users/CN=batinkov/CN=739757/CN=Atanas Ivanov Batinkov',
+               '/DC=ch/DC=cern/OU=Organic Units/OU=Users/CN=bvanbesi/CN=759373/CN=Broen van Besien',])
 server.source('DQMUnknown')
 server.source('DQMOverlay')
 server.source('DQMStripChart')
 server.source('DQMCertification')
 server.source('DQMLive', "localhost:8061")
-server.source('DQMArchive', "%s/ix" % STATEDIR, '^/Global/')
+server.source('DQMArchive', "%s/ix128" % STATEDIR, '^/Global/')
 server.source('DQMLayout')
 
 execfile(CONFIGDIR + "/dqm-services.py")

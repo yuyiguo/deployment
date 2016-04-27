@@ -118,7 +118,7 @@ class SystemMonitor(Monitor):
     @param proc_name -- regex pattern to match process name
     @param activity -- list of activities to log.
     The allowed activities are:
-    cpu, mem, user, system, rss, vms, threads, connections, io, files"""
+    cpu, mem, swp, user, system, rss, vms, swap, threads, connections, io, files"""
 
     def safemsg(field, f):
       try:
@@ -130,42 +130,83 @@ class SystemMonitor(Monitor):
         pass
       return msg
 
+    def safefield(field, f):
+      try:
+        return f()
+      except Exception, e:
+        if can_talk:
+          logmsg(svc, "SYSTEM", "IGNORE", "failed to get %s field information: %s" % (field, str(e).replace("\n", "; ")))
+        pass
+        return 0
+
+    def addfield(dic, field, value):
+      try:
+        dic[field] += value
+      except:
+        dic[field] = value
+
+    def swap_info(proc):
+      f = open("/proc/" + str(proc.pid) + "/status")
+      match = re.search("VmSwap:\s+([0-9]+)\skB", f.read())
+      return int(match.group(1)) * 1024
+
+    def swap_percent(proc):
+      return swap_info(proc) * 100.0 / psutil.swap_memory().total
+
     if not psutil:
       return
-    for pid in psutil.get_pid_list():
-      proc = psutil.Process(pid)
-      if proc.username != svc:
+
+    data = {'processes': 0}
+    for proc in psutil.process_iter():
+      if proc.username() != svc:
         continue
-      cmd  = ' '.join(proc.cmdline)
+      cmd  = ' '.join(proc.cmdline())
       name = cmd.split('/')[-1]
       if proc_name and not re.search(proc_name, cmd):
         continue
-      msg  = 'PID: %s, NAME: %s, STATUS: %s' % (pid, name, proc.status)
-      mem_info = proc.get_memory_info()
-      cpu_info = proc.get_cpu_times()
+      mem_info = proc.memory_info()
+      cpu_info = proc.cpu_times()
+      data['processes'] += 1
       for field in activity:
         field = field.strip()
         if field == 'cpu':
-          msg += ', CPU: %3.1f%%' % proc.get_cpu_percent(interval=1.0)
+          addfield(data, field, proc.cpu_percent())
         elif field == 'mem':
-          msg += ', MEM: %3.1f%%' % proc.get_memory_percent()
+          addfield(data, field, proc.memory_percent())
+        elif field == 'swp':
+          addfield(data, field, swap_percent(proc))
         elif field == 'user':
-          msg += ', USER: %s' % cpu_info.user
+          addfield(data, field, cpu_info.user)
         elif field == 'system':
-          msg += ', SYSTEM: %s' % cpu_info.system
+          addfield(data, field, cpu_info.system)
         elif field == 'rss':
-          msg += ', RSS: %s' % mem_info.rss
+          addfield(data, field, mem_info.rss)
         elif field == 'vms':
-          msg += ', VMS: %s' % mem_info.vms
+          addfield(data, field, mem_info.vms)
+        elif field == 'swap':
+          addfield(data, field, swap_info(proc))
         elif field == 'threads':
-          msg += safemsg(field, proc.get_num_threads)
+          addfield(data, field, safefield('threads', proc.num_threads))
         elif field == 'connections':
-          msg += safemsg(field, proc.get_connections)
+          addfield(data, field, safefield('connections', proc.connections))
         elif field == 'io':
-          msg += safemsg(field, proc.get_io_counters)
+          addfield(data, field, safefield('io', proc.io_counters))
         elif field == 'files':
-          msg += safemsg(field, proc.get_open_files)
-      logmsg(svc, "SYSTEM", msg)
+          addfield(data, field, safefield('files', proc.open_files))
+
+    if data['processes'] < 1:
+      return
+    msg  = 'PROCESSES: %s' % str(data['processes'])
+    for field in activity:
+      field = field.strip()
+      if field in ['pid', 'name', 'status']:
+        continue
+      if field in ['cpu', 'mem', 'swp']:
+        msg += ', %s: %3.1f%%' % (field.upper(), data[field])
+      else:
+        msg += ', %s: %s' % (field.upper(), data[field])
+
+    logmsg(svc, "SYSTEM", msg)
 
 class ProcessMonitor(Monitor):
   """Monitor which looks for process command lines matching a regexp.
@@ -221,6 +262,29 @@ class URLMonitor(Monitor):
     methods.append(urllib2.HTTPRedirectHandler())
     self.opener = urllib2.build_opener(*methods)
 
+  def _get_url(self, url, headers):
+    req = urllib2.Request(url)
+    req.add_header("User-Agent", "ServerMonitor/2.0")
+    for h, v in headers:
+      req.add_header(h, v)
+
+    if sys.version_info < (2, 6, 0):
+      socket.setdefaulttimeout(10)
+      obj = self.opener.open(req)
+    else:
+      obj = self.opener.open(req, timeout = 10)
+
+    return "%s\n%s" % (obj.info(), obj.read())    
+
+class URLPingMonitor(URLMonitor):
+  """URLPingMonitor which matches HTTP server response to a regexp."""
+  def __init__(self, task_queue, debug_level = 0):
+    """Initialise the URL ping monitor.
+
+    @param task_queue -- queue for incoming tasks
+    @param debug_level -- urllib2 http connection debug level."""
+    URLMonitor.__init__(self, task_queue, debug_level)
+
   def _do(self, svc, can_talk, url, regex, headers):
     """Ping a URL and check the response matches a regexp.
 
@@ -230,18 +294,7 @@ class URLMonitor(Monitor):
     @param regex -- regular expression to match against the reply.
     @param headers -- extra http request headers required."""
     try:
-      req = urllib2.Request(url)
-      req.add_header("User-Agent", "ServerMonitor/2.0")
-      for h, v in headers:
-        req.add_header(h, v)
-
-      if sys.version_info < (2, 6, 0):
-        socket.setdefaulttimeout(10)
-        obj = self.opener.open(req)
-      else:
-        obj = self.opener.open(req, timeout = 10)
-
-      reply = "%s\n%s" % (obj.info(), obj.read())
+      reply = self._get_url(url, headers)
       if re.search(regex, reply, re.S):
         logmsg(svc, "PING", "OK", "<%s>" % url)
       elif can_talk:
@@ -249,6 +302,39 @@ class URLMonitor(Monitor):
     except Exception, e:
       if can_talk:
         logmsg(svc, "PING", "FAILED", "<%s>" % url, regex, str(e).replace("\n", "; "))
+
+class URLReportMonitor(URLMonitor):
+  """URLReportMonitor which reports matches of HTTP server response to regexps."""
+  def __init__(self, task_queue, debug_level = 0):
+    """Initialise the URL report monitor.
+
+    @param task_queue -- queue for incoming tasks
+    @param debug_level -- urllib2 http connection debug level."""
+    URLMonitor.__init__(self, task_queue, debug_level)
+
+  def _do(self, svc, can_talk, url, rxlist, headers):
+    """Ping a URL and check the response matches a regexp.
+
+    @param svc -- service name
+    @param can_talk -- can talk about problems
+    @param url -- the server to connect to, should be http (not https)
+    @param rxlist -- regular expressions to match against the reply.
+    @param headers -- extra http request headers required."""
+    rxlist = map(lambda rx: re.compile(rx), rxlist)
+    try:
+      reply = self._get_url(url, headers)
+      for rx in rxlist:
+        matches = re.findall(rx, reply)
+        for m in matches:
+          logmsg(svc, "URLREPORT", "url:<%s>:" % url, str(m))
+    except Exception, e:
+      if can_talk:
+        trace = StringIO()
+        traceback.print_exc(file=trace)
+        logmsg(svc, "URLREPORT", "url:<%s>:0" % url,
+                 "failed to fetch url: %s" % str(e))
+        for line in trace.getvalue().rstrip().split("\n"):
+          logmsg(svc, "FAILURE", line)
 
 class LogMonitor(Monitor):
   """Monitor which scans log files against regexp patterns.
@@ -304,7 +390,7 @@ class LogMonitor(Monitor):
       else:
         next = file.read(1048576)
         linebuf = linebuf[pos:] + next
-        if linebuf == '': break
+        if next == '': break
         offset += pos
         pos = 0
 
@@ -412,7 +498,7 @@ class LogErrorMonitor(LogMonitor):
     LogMonitor.__init__(self, task_queue, state_dir, "log-state")
 
   def _match(self, svc, fname, start, line, rx, match):
-    """Repot log match.
+    """Report log match.
 
     @param svc -- service name
     @param fname -- log file in which match was found
@@ -433,7 +519,7 @@ class LogValueMonitor(LogMonitor):
     LogMonitor.__init__(self, task_queue, state_dir, "report-state")
 
   def _match(self, svc, fname, start, line, rx, match):
-    """Repot log match.
+    """Report log match.
 
     @param svc -- service name
     @param fname -- log file in which match was found
@@ -648,19 +734,34 @@ class MonitorDaemon:
       if m: s.ps_regex = m.group(1); continue
 
       m = re.match(r"^PING_URL='(.*)'$", line)
-      if m: s.ping_url = m.group(1); continue
+      if m: s.url_ping = m.group(1); continue
       m = re.match(r'^PING_URL="(.*)"$', line)
-      if m: s.ping_url = m.group(1); continue
+      if m: s.url_ping = m.group(1); continue
 
       m = re.match(r"^PING_REGEX='(.*)'$", line)
-      if m: s.ping_regex = m.group(1); continue
+      if m: s.url_ping_regex = m.group(1); continue
       m = re.match(r'^PING_REGEX="(.*)"$', line)
-      if m: s.ping_regex = m.group(1); continue
+      if m: s.url_ping_regex = m.group(1); continue
 
       m = re.match(r"^PING_HEADER='(.*?): (.*)'$", line)
-      if m: s.ping_headers.append((m.group(1), m.group(2))); continue
+      if m: s.url_ping_headers.append((m.group(1), m.group(2))); continue
       m = re.match(r'^PING_HEADER="(.*?): (.*)"$', line)
-      if m: s.ping_headers.append((m.group(1), m.group(2))); continue
+      if m: s.url_ping_headers.append((m.group(1), m.group(2))); continue
+
+      m = re.match(r"^REPORT_URL='(.*)'$", line)
+      if m: s.url_report = m.group(1); continue
+      m = re.match(r'^REPORT_URL="(.*)"$', line)
+      if m: s.url_report = m.group(1); continue
+
+      m = re.match(r"^REPORT_URL_REGEX='(.*)'$", line)
+      if m: s.url_report_regex.append(m.group(1)); continue
+      m = re.match(r'^REPORT_URL_REGEX="(.*)"$', line)
+      if m: s.url_report_regex.append(m.group(1)); continue
+
+      m = re.match(r"^REPORT_URL_HEADER='(.*?): (.*)'$", line)
+      if m: s.url_report_headers.append((m.group(1), m.group(2))); continue
+      m = re.match(r'^REPORT_URL_HEADER="(.*?): (.*)"$', line)
+      if m: s.url_report_headers.append((m.group(1), m.group(2))); continue
 
       m = re.match(r"^PROCESS_OWNER='(.*)'$", line)
       if m: s.process_owner = m.group(1); continue
@@ -688,14 +789,16 @@ class MonitorDaemon:
     qexit = Queue()
     qptask = Queue()
     qstask = Queue()
-    qutask = Queue()
+    quptask = Queue()
+    qurtask = Queue()
     qletask = Queue()
     qlvtask = Queue()
-    queues = [qptask, qstask, qletask, qlvtask, qutask]
+    queues = [qptask, qstask, qletask, qlvtask, quptask, qurtask]
     mon = [[ProcessMonitor(qptask)], [SystemMonitor(qstask)],
            [LogErrorMonitor(qletask, self.feeddir)],
            [LogValueMonitor(qlvtask, self.feeddir)],
-           [URLMonitor(qutask) for i in xrange(0, 10)]]
+           [URLPingMonitor(quptask) for i in xrange(0, 10)],
+           [URLReportMonitor(qurtask) for i in xrange(0, 10)]]
     for m in mon:
       map(lambda i: i.start(), m)
 
@@ -762,9 +865,12 @@ class MonitorDaemon:
           s.log_val_files = []
           s.log_val_regex = []
           s.ps_regex = None
-          s.ping_url = None
-          s.ping_regex = None
-          s.ping_headers = []
+          s.url_ping = None
+          s.url_ping_regex = None
+          s.url_ping_headers = []
+          s.url_report = None
+          s.url_report_regex = []
+          s.url_report_headers = []
           s.process_owner = None
           s.process_activity = ['cpu', 'mem', 'threads']
           s.process_regex_name = None
@@ -800,8 +906,10 @@ class MonitorDaemon:
           qlvtask.put((s.svcname, s.can_talk, s.log_dir, s.log_val_files, s.log_val_regex))
         if s.ps_regex:
           qptask.put((s.svcname, s.can_talk, s.ps_regex))
-        if s.ping_url and s.ping_regex:
-          qutask.put((s.svcname, s.can_talk, s.ping_url, s.ping_regex, s.ping_headers + authz))
+        if s.url_ping and s.url_ping_regex:
+          quptask.put((s.svcname, s.can_talk, s.url_ping, s.url_ping_regex, s.url_ping_headers + authz))
+        if s.url_report and s.url_report_regex:
+          qurtask.put((s.svcname, s.can_talk, s.url_report, s.url_report_regex, s.url_report_headers + authz))
         if s.process_owner:
           qstask.put((s.process_owner, s.can_talk, s.process_regex_name, s.process_activity))
 

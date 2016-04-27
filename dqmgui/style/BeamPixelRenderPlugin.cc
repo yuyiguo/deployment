@@ -2,8 +2,8 @@
   \File BeamPixelRenderPlugin
   \Display Plugin for BeamSpot from Pixel-Vertices
   \author Mauro Dinardo
-  \version $ Revision: 1.0 $
-  \date $ Date: 2010/30/03 08:11:00 $
+  \version $ Revision: 3.5 $
+  \date $ Date: 2015/17/08 23:00:00 $
 */
 
 #include "DQM/DQMRenderPlugin.h"
@@ -18,6 +18,7 @@
 #include "TColor.h"
 #include "TText.h"
 #include "TPaveStats.h"
+#include "TGaxis.h"
 #include <cassert>
 #include <math.h>
 
@@ -30,7 +31,7 @@ public:
 
  virtual void initialise (int, char **)
   {
-   // Make rainbow colors. Assign colors positions 1101-1200
+    // Make rainbow colors. Assign colors positions 1101-1200
     NCont_rainbow = 100; // Specify number of contours for rainbow
 
     double stops_rainbow[] = { 0.00, 0.34, 0.61, 0.84, 1.00 };
@@ -59,76 +60,57 @@ public:
 	  }
       }
   }
-
-  virtual bool applies(const VisDQMObject& o, const VisDQMImgInfo& )
+  
+  virtual bool applies (const VisDQMObject& o, const VisDQMImgInfo& )
   {
     if (o.name.find("BeamPixel/") != std::string::npos) return true;
 
     return false;
   }
 
-  virtual void preDraw(TCanvas* c, const VisDQMObject& o, const VisDQMImgInfo& , VisDQMRenderInfo& )
+  virtual void preDraw (TCanvas* c, const VisDQMObject& o, const VisDQMImgInfo& , VisDQMRenderInfo& )
   {
     c->cd();
 
-    if (dynamic_cast<TH2F*>(o.object)) preDrawTH2F(c, o);
-
-    if (dynamic_cast<TH1F*>(o.object)) preDrawTH1F(c, o);
-
+    if (dynamic_cast<TH2F*>(o.object))     preDrawTH2F(c, o);
+    if (dynamic_cast<TH1F*>(o.object))     preDrawTH1F(c, o);
     if (dynamic_cast<TProfile*>(o.object)) preDrawTProfile(c, o);
+  }
+
+  virtual void postDraw (TCanvas* c, const VisDQMObject& o, const VisDQMImgInfo& )
+  {
+    c->cd();
+    
+    if (dynamic_cast<TH2F*>(o.object))     postDrawTH2F(c, o);
+    if (dynamic_cast<TH1F*>(o.object))     postDrawTH1F(c, o);
+    if (dynamic_cast<TProfile*>(o.object)) postDrawTProfile(c, o);
   }
 
 private:
 
-  void preDrawTH2F(TCanvas* c, const VisDQMObject& o)
+  void preDrawTH2F (TCanvas* c, const VisDQMObject& o)
   {
     TH2F* obj = dynamic_cast<TH2F*>(o.object);
     assert(obj);
 
-    // This applies to all
-    gStyle->SetCanvasBorderMode(0);
-    gStyle->SetPadBorderMode(0);
-    gStyle->SetPadBorderSize(0);
-
-    TAxis* xa = obj->GetXaxis();
-    TAxis* ya = obj->GetYaxis();
-
-    if ((o.name.find("vertex zx") != std::string::npos) || (o.name.find("vertex zy") != std::string::npos) || (o.name.find("vertex xy") != std::string::npos))
+    if ((o.name.find("E - vertex zx") != std::string::npos) || (o.name.find("E - vertex zy") != std::string::npos) || (o.name.find("E - vertex xy") != std::string::npos) ||
+	(o.name.find("G - vertex zx cum") != std::string::npos) || (o.name.find("G - vertex zy cum") != std::string::npos) || (o.name.find("G - vertex xy cum") != std::string::npos))
       {
-	xa->SetTitleOffset(1.15);
-	ya->SetTitleOffset(1.15);
-
-	xa->SetTitleSize(0.04);
-	ya->SetTitleSize(0.04);
-
-	xa->SetLabelSize(0.03);
-	ya->SetLabelSize(0.03);
-
 	c->SetGrid();
+	c->SetRightMargin(0.12);
+
 	obj->SetContour(NCont_rainbow);
-	gStyle->SetPalette(NCont_rainbow, hcalRainbowColors);
-	gStyle->SetOptStat(1110);
-	obj->SetStats(kTRUE);
+	obj->SetStats(false);
 	obj->SetOption("colz");
-	gStyle->SetStatX(0.9);
-	gStyle->SetStatY(0.9);
 
 	return;
       }
 
-    if (o.name.find("fit results") != std::string::npos)
+    if (o.name.find("A - fit results") != std::string::npos)
       {
-	xa->SetTitleOffset(1.15);
-	ya->SetTitleOffset(1.15);
-
-	xa->SetTitleSize(0.04);
-	ya->SetTitleSize(0.04);
-
-	xa->SetLabelSize(0.045);
-	ya->SetLabelSize(0.045);
-
 	c->SetGrid();
-	obj->SetStats(kFALSE);
+
+	obj->SetStats(false);
 	obj->SetMarkerSize(2.);
 
 	return;
@@ -136,24 +118,127 @@ private:
 
     if (o.name.find("reportSummaryMap") != std::string::npos)
       {
-	c->SetGrid(kFALSE, kFALSE);
-	obj->SetStats(kFALSE);
+	c->SetGrid(false, false);
+
+	obj->GetXaxis()->SetLabelSize(0);
+	obj->GetXaxis()->SetTickLength(0);
+
+	obj->GetYaxis()->SetLabelSize(0);
+	obj->GetYaxis()->SetTickLength(0);
+
+	obj->SetStats(false);
 
 	return;
       }
   }
 
-  void preDrawTH1F(TCanvas* c, const VisDQMObject& o)
+  void preDrawTH1F (TCanvas* c, const VisDQMObject& o)
   {
     TH1F* obj = dynamic_cast<TH1F*>(o.object);
     assert(obj);
 
-    // This applies to all
-    c->SetGrid(kFALSE, kFALSE);
+    c->SetGrid(false, true);
+    c->SetTopMargin(0.12);
+    
+    obj->SetMarkerStyle(20);
+    obj->SetMarkerColor(4);
+    
+    if ((o.name.find("K - app status vs lumi") != std::string::npos) ||
+	(o.name.find("F - vertex x") != std::string::npos) || (o.name.find("F - vertex y") != std::string::npos) || (o.name.find("F - vertex z") != std::string::npos) ||
+	(o.name.find("H - vertex x cum") != std::string::npos) || (o.name.find("H - vertex y cum") != std::string::npos) || (o.name.find("H - vertex z cum") != std::string::npos) ||
+	(o.name.find("I - good vertices vs lumi") != std::string::npos) || (o.name.find("J - pixelHits vs lumi") != std::string::npos))
+      c->SetGrid(false, false);
+    
+    if ((o.name.find("B - muX vs lumi") != std::string::npos) || (o.name.find("B - muY vs lumi") != std::string::npos) || (o.name.find("B - muZ vs lumi") != std::string::npos) ||
+	(o.name.find("C - sigmaX vs lumi") != std::string::npos) || (o.name.find("C - sigmaY vs lumi") != std::string::npos) || (o.name.find("C - sigmaZ vs lumi") != std::string::npos) ||
+	(o.name.find("D - dxdz vs lumi") != std::string::npos) || (o.name.find("D - dydz vs lumi") != std::string::npos) ||
+	(o.name.find("I - good vertices vs lumi") != std::string::npos) || (o.name.find("J - pixelHits vs lumi") != std::string::npos) ||
+	(o.name.find("K - app status vs lumi") != std::string::npos))
+      {
+	obj->SetMarkerSize(0.5);
+
+	return;
+      }
+  }
+
+  void preDrawTProfile (TCanvas* c, const VisDQMObject& o)
+  {
+    TProfile* obj = dynamic_cast<TProfile*>(o.object);
+    assert(obj);
+
+    c->SetGrid();
+  }
+
+  void postDrawTH2F (TCanvas* c, const VisDQMObject& o)
+  {
+    TH2F* obj = dynamic_cast<TH2F*>(o.object);
+    assert(obj);
+
+    TGaxis::SetMaxDigits(3);
 
     gStyle->SetCanvasBorderMode(0);
     gStyle->SetPadBorderMode(0);
     gStyle->SetPadBorderSize(0);
+
+    TAxis* xa = obj->GetXaxis();
+    TAxis* ya = obj->GetYaxis();
+
+    if ((o.name.find("E - vertex zx") != std::string::npos) || (o.name.find("E - vertex zy") != std::string::npos) || (o.name.find("E - vertex xy") != std::string::npos) ||
+	(o.name.find("G - vertex zx cum") != std::string::npos) || (o.name.find("G - vertex zy cum") != std::string::npos) || (o.name.find("G - vertex xy cum") != std::string::npos))
+      {
+	xa->SetTitleOffset(1.15);
+	ya->SetTitleOffset(1.15);
+	
+	xa->SetTitleSize(0.04);
+	ya->SetTitleSize(0.04);
+	
+	xa->SetLabelSize(0.04);
+	ya->SetLabelSize(0.04);
+	
+	c->SetGrid();
+
+	gStyle->SetPalette(NCont_rainbow, hcalRainbowColors);
+	
+	return;
+      }
+
+    if (o.name.find("A - fit results") != std::string::npos)
+      {
+	xa->SetTitleOffset(0.85);
+	ya->SetTitleOffset(1.15);
+	
+	xa->SetTitleSize(0.055);
+	ya->SetTitleSize(0.04);
+
+	xa->SetLabelSize(0.06);
+	ya->SetLabelSize(0.06);
+
+        c->SetGrid();
+
+        return;
+      }
+
+    if (o.name.find("reportSummaryMap") != std::string::npos)
+      {
+	c->SetGrid(false, false);
+	
+	return;
+      }
+  }
+
+  void postDrawTH1F (TCanvas* c, const VisDQMObject& o)
+  {
+    TH1F* obj = dynamic_cast<TH1F*>(o.object);
+    assert(obj);
+
+    TGaxis::SetMaxDigits(3);
+
+    c->SetGrid(false, true);
+
+    gStyle->SetCanvasBorderMode(0);
+    gStyle->SetPadBorderMode(0);
+    gStyle->SetPadBorderSize(0);
+
     gStyle->SetOptStat(111110);
 
     TAxis* xa = obj->GetXaxis();
@@ -165,44 +250,55 @@ private:
     xa->SetTitleSize(0.04);
     ya->SetTitleSize(0.04);
 
-    xa->SetLabelSize(0.03);
-    ya->SetLabelSize(0.03);
+    xa->SetLabelSize(0.04);
+    ya->SetLabelSize(0.04);
 
-    if ((o.name.find("hist pixelHits vs lumi") != std::string::npos) || (o.name.find("hist good vx vs lumi") != std::string::npos))
+    if (o.name.find("K - app status vs lumi") != std::string::npos)
       {
-	gStyle->SetOptStat(10);
+	c->SetGrid(false, false);
 
-	gStyle->SetErrorX(0.);
+	ya->SetRangeUser(-6,6);
+
+	gStyle->SetOptStat(10);
 	gStyle->SetEndErrorSize(0.);
 
-	obj->SetMarkerStyle(20);
-	obj->SetMarkerSize(0.4);
-	obj->SetMarkerColor(4);
+	TPaveStats* st = (TPaveStats*)obj->FindObject("stats");
+	st->SetY1NDC(0.9);
 
 	return;
       }
+    
+    if ((o.name.find("F - vertex x") != std::string::npos) || (o.name.find("F - vertex y") != std::string::npos) || (o.name.find("F - vertex z") != std::string::npos) ||	
+	(o.name.find("H - vertex x cum") != std::string::npos) || (o.name.find("H - vertex y cum") != std::string::npos) || (o.name.find("H - vertex z cum") != std::string::npos) ||
+	(o.name.find("I - good vertices vs lumi") != std::string::npos) || (o.name.find("J - pixelHits vs lumi") != std::string::npos))
+      c->SetGrid(false, false);
 
-    if ((o.name.find("muX vs lumi") != std::string::npos) || (o.name.find("muY vs lumi") != std::string::npos) || (o.name.find("muZ vs lumi") != std::string::npos) ||
-	(o.name.find("sigmaX vs lumi") != std::string::npos) || (o.name.find("sigmaY vs lumi") != std::string::npos) || (o.name.find("sigmaZ vs lumi") != std::string::npos) ||
-	(o.name.find("dxdz vs lumi") != std::string::npos) || (o.name.find("dydz vs lumi") != std::string::npos) || (o.name.find("pixelHits vs lumi") != std::string::npos) ||
-	(o.name.find("good vertices vs lumi") != std::string::npos))
+    if ((o.name.find("B - muX vs lumi") != std::string::npos) || (o.name.find("B - muY vs lumi") != std::string::npos) || (o.name.find("B - muZ vs lumi") != std::string::npos) ||
+	(o.name.find("C - sigmaX vs lumi") != std::string::npos) || (o.name.find("C - sigmaY vs lumi") != std::string::npos) || (o.name.find("C - sigmaZ vs lumi") != std::string::npos) ||
+	(o.name.find("D - dxdz vs lumi") != std::string::npos) || (o.name.find("D - dydz vs lumi") != std::string::npos) ||
+	(o.name.find("I - good vertices vs lumi") != std::string::npos) || (o.name.find("J - pixelHits vs lumi") != std::string::npos))
       {
 	gStyle->SetOptFit(1110);
 	gStyle->SetOptStat(10);
-
+	
+ 	gStyle->SetErrorX(0.);
+	gStyle->SetEndErrorSize(0.);
+	
 	return;
       }
   }
 
-  void preDrawTProfile(TCanvas* c, const VisDQMObject& o)
+  void postDrawTProfile (TCanvas* c, const VisDQMObject& o)
   {
     TProfile* obj = dynamic_cast<TProfile*>(o.object);
     assert(obj);
 
-    // This applies to all
+    TGaxis::SetMaxDigits(3);
+
     gStyle->SetCanvasBorderMode(0);
     gStyle->SetPadBorderMode(0);
     gStyle->SetPadBorderSize(0);
+
     gStyle->SetOptStat(1110);
 
     TAxis* xa = obj->GetXaxis();
@@ -214,8 +310,8 @@ private:
     xa->SetTitleSize(0.04);
     ya->SetTitleSize(0.04);
 
-    xa->SetLabelSize(0.03);
-    ya->SetLabelSize(0.03);
+    xa->SetLabelSize(0.04);
+    ya->SetLabelSize(0.04);
 
     c->SetGrid();
   }

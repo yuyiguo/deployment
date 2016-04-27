@@ -92,7 +92,7 @@ public:
     }
 
 private:
-  void preDrawTH2F( TCanvas *, const VisDQMObject &o )
+  void preDrawTH2F( TCanvas *c, const VisDQMObject &o )
     {
       TH2F* obj = dynamic_cast<TH2F*>( o.object );
       assert( obj );
@@ -176,7 +176,7 @@ private:
         return;
       }
 
-      if( o.name.find( "StripClusVsPixClus" )  != std::string::npos)
+	  if( o.name.find( "StripClusVsPixClus" )  != std::string::npos)
       {
         obj->SetStats( kFALSE );
         gStyle->SetPalette(1,0);
@@ -184,7 +184,24 @@ private:
 	return;
       }
 
-      if( o.name.find( "SeedPhiVsEta" )  != std::string::npos)
+	  if( o.name.find( "ClusterWidths_vs_Amplitudes" )  != std::string::npos)
+      {
+        obj->SetStats( kFALSE );
+        gStyle->SetPalette(1,0);
+		c->SetLogz(1);
+        obj->SetOption("colz");
+	return;
+      }
+
+	  if( o.name.find( "SeedPhiVsEta" )  != std::string::npos)
+      {
+        obj->SetStats( kFALSE );
+        gStyle->SetPalette(1,0);
+        obj->SetOption("colz");
+	return;
+      }
+
+	if( o.name.find( "TrackCandPhiVsEta" )  != std::string::npos)
       {
         obj->SetStats( kFALSE );
         gStyle->SetPalette(1,0);
@@ -371,7 +388,7 @@ private:
         return;
       }
 
-      if( o.name.find( "NumberOfRecHitVsPhiVsEta" )  != std::string::npos)
+      if( o.name.find( "VsPhiVsEtaPerTrack" )  != std::string::npos)
       {
         obj->SetStats( kFALSE );
         gStyle->SetPalette(1,0);
@@ -379,7 +396,7 @@ private:
       return;
     }
 
-      if( o.name.find( "NumberOfLayersVsPhiVsEta" ) != std::string::npos )
+	  if( o.name.find( "StripClusVsBXandOrbit" ) != std::string::npos)
       {
         obj->SetStats( kFALSE );
         gStyle->SetPalette(1,0);

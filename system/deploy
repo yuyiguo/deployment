@@ -111,18 +111,19 @@ hostcert_to_system()
 system_groups_and_accounts()
 {
   # Create groups. Add myself to all the groups.
-  for ng in T:100000:_config    F:100001:_empty       T:100002:_sw         \
-            T:100003:_auth      T:100010:_frontend    T:100020:_admin      \
-            T:100021:_base      T:100022:_couchdb     T:100023:_das        \
-            T:100024:_dbs       T:100026:_dqmgui      T:100027:_filemover  \
-            T:100028:_overview  T:100029:_phedex      T:100030:_sitedb     \
-            T:100031:_t0mon     T:100032:_mongodb     T:100033:_reqmgr     \
-            T:100034:_workqueue T:100035:_configcache T:100037:_t0datasvc  \
-            T:100038:_reqmon    T:100039:_crabserver  T:100040:_crabcache  \
-            T:100041:_dmwmmon   T:100042:_an_reqmgr   T:100043:_an_workqueue\
+  for ng in T:100000:_config    F:100001:_empty       T:100002:_sw           \
+            T:100003:_auth      T:100010:_frontend    T:100020:_admin        \
+            T:100021:_base      T:100022:_couchdb     T:100023:_das          \
+            T:100024:_dbs       T:100026:_dqmgui      T:100027:_filemover    \
+            T:100028:_overview  T:100029:_phedex      T:100030:_sitedb       \
+            T:100031:_t0mon     T:100032:_mongodb     T:100033:_reqmgr       \
+            T:100034:_workqueue T:100035:_configcache T:100037:_t0datasvc    \
+            T:100038:_reqmon    T:100039:_crabserver  T:100040:_crabcache    \
+            T:100041:_dmwmmon   T:100042:_an_reqmgr   T:100043:_an_workqueue \
             T:100044:_an_reqmon T:100045:_t0wmadatasvc T:100046:_dbsmigration\
-            T:100047:_t0_reqmon T:100048:_reqmgr2     T:100049:_acdcserver \
-            T:100050:_gitweb    T:100051:_bigcouch; do
+            T:100047:_t0_reqmon T:100048:_reqmgr2     T:100049:_acdcserver   \
+            T:100050:_gitweb    T:100051:_bigcouch    T:100052:_victorweb    \
+            T:100053:_popdbweb  T:100054:_dcafpilot   T:100055:_confdb; do
     add_local_group $(echo $ng | tr : " ")
   done
 
@@ -161,6 +162,10 @@ system_groups_and_accounts()
   add_local_user 100049 _acdcserver   ,_config "ACDC Server App"
   add_local_user 100050 _gitweb       ,_config "GitWeb App"
   add_local_user 100051 _bigcouch     ,_config "BigCouch App"
+  add_local_user 100052 _victorweb   ,_config "Victor Cleaner App"
+  add_local_user 100053 _popdbweb    ,_config "CMS Popularity App"
+  add_local_user 100054 _dcafpilot   ,_config "DCAFPilot App"
+  add_local_user 100055 _confdb      ,_config "ConfDB App"
 
   # Restart nscd to flush account changes. Current account will _not_
   # see these changes before logout/login however, so commands below
@@ -217,23 +222,23 @@ system_install_hostcert()
     fi
   done
   if $badcert; then
+    # no valid cert with enough life left was found. Getting a new one
     case $(hostname -f) in
       *.cern.ch )
 	(set -e
-	 cd /tmp
-	 tmp=$(mktemp -d -t cert-$$-XXXXX)
-	 req=$(hostname -s).csr
-	 cn=/CN=$(hostname -f)
-	 cd $tmp
-         note "WARNING: requesting now a new host certificate via ca.cern.ch"
-         note "WARNING: you will prompted for your login or grid certificate password"
-         note "WARNING: by supplying your password you agree to CERN computing rules"
+         cd /tmp
+         tmp=$(mktemp -d -t cert-$$-XXXXX)
+         req=$(hostname -s).csr
+         cn=/CN=$(hostname -f)
+         cd $tmp
+         note "WARNING: requesting now a new grid host certificate via gridca.cern.ch"
+         note "WARNING: it will use your kerberos credentials for the Single Sign On."
          openssl req -new -subj $cn -out $req -nodes -sha512 -newkey rsa:2048 -keyout hostkey.pem
-	 $project_config_src/careq-cern-ch $req hostcert.pem 1>&11 2>&22
-	 chmod 400 $req hostkey.pem
-	 chmod 644 hostcert.pem
-	 mv -f $req host{key,cert}.pem $CMS_DEV_ROOT/certs
-	 rm -r $tmp)
+         $project_config_src/careq-cern-ch $req hostcert.pem 1>&11 2>&22
+         chmod 400 $req hostkey.pem
+         chmod 644 hostcert.pem
+         mv -f $req host{key,cert}.pem $CMS_DEV_ROOT/certs
+         rm -r $tmp)
 	[ $? = 0 ]
 	;;
 
@@ -304,6 +309,9 @@ deploy_system_post()
       sudo sh -c '/usr/bin/puppet agent -t' ||
         note "WARNING: puppet agent exited with code $?."
 
+      sudo sh -c '/usr/local/sbin/distro_sync.sh &> /dev/null' ||
+        note "WARNING: distro_sync script exited with code $?."
+
       # Must have various directories.
       [ -d /data/user ]
       [ -d /data/certs ]
@@ -360,7 +368,7 @@ deploy_system_post()
 
           note "IMPORTANT: run the following to update /root/.ssh/known_hosts"
           note "   sudo cfg/admin/ImageKey start"
-          note "   for h in vocms{0,}{34,12{7,8},13{2,3,4,5,6,8,9},140,16{0,1,2,3}}{,.cern.ch}; do"
+          note "   for h in vocms0{306,307,318,12{6,7,8},13{1,2,4,5,6,8,9},140,16{0,1,2,3,4,5}}{,.cern.ch}; do"
           note "     echo \$h; sudo cfg/admin/ImageKey run ssh cmsweb@\$h uptime"
           note "   done"
           note "   sudo cfg/admin/ImageKey stop"
@@ -416,36 +424,45 @@ deploy_system_post()
         /etc/sudoers /etc/sudoers.d/cern-config-users 2> /dev/null
 
       # Install additional yum repositories
-      #  EGI-trustanchors provides the updated CAs
+
+      # EGI-trustanchors provides the updated CAs
       sudo wget -q -O /etc/yum.repos.d/egi-trustanchors.repo \
         http://repository.egi.eu/sw/production/cas/1/current/repo-files/egi-trustanchors.repo
-      #  (glite-VOBOX instead of glite-SCAS?)
-      sudo wget -q -O /etc/yum.repos.d/glite-scas.repo \
-        http://cern.ch/grid-deployment/glite/repos/3.2/glite-SCAS.repo
+
+      # EMI Grid middleware
+      case $arch in
+        slc5*) sudo rpm -ivh --force \
+                 http://emisoft.web.cern.ch/emisoft/dist/EMI/3/sl5/x86_64/base/emi-release-3.0.0-2.el5.noarch.rpm
+               ;;
+        * ) sudo rpm -ivh --force \
+              http://emisoft.web.cern.ch/emisoft/dist/EMI/3/sl6/x86_64/base/emi-release-3.0.0-2.el6.noarch.rpm      
+            ;;
+      esac
+
+      # WLCG specific (needed for getting the cms voms config files)
+      sudo wget -q -O /etc/yum.repos.d/wlcg.sl6.repo \
+        http://linuxsoft.cern.ch/wlcg/wlcg-sl6.repo
+      sudo wget -q -O /etc/pki/rpm-gpg/RPM-GPG-KEY-wlcg \
+        http://linuxsoft.cern.ch/wlcg/RPM-GPG-KEY-wlcg
 
       # Install additional required packages.
       note "INFO: installing required system packages. This operation may take a few minutes complete."
       sudo yum -y install \
         tk compat-libstdc++-33 'ca_*' dummy-ca-certs lcg-CA \
-	fetch-crl edg-mkgridmap git-all stgit colordiff libXpm-devel finger \
+	fetch-crl git-all stgit colordiff libXpm-devel finger \
 	$(yum -q list compat-{readline5,libtermcap} perl-ExtUtils-Embed 2>/dev/null | \
 	  grep -v -e '^Installed' -e '^Available' | awk '{print $1}') \
-        libXmu mesa-libGLU arc.x86_64
+        libXmu mesa-libGLU arc.x86_64 arc-server
 
-      # Install myproxy and voms tools as there is no slc6 build for it in AFS.
-      # Only gets the voms configuration from AFS.
-      sudo yum -y install myproxy
-      sudo rsync -cavu \
-        /afs/cern.ch/project/gd/LCG-share/current/glite/etc/vomses/ /etc/vomses/
-      sudo rsync -cavu \
-        /afs/cern.ch/project/gd/LCG-share/current/external/etc/grid-security/vomsdir/ \
-        /etc/grid-security/vomsdir/
-      sudo chown -R root:root /etc/vomses /etc/grid-security/vomsdir
+      # Install myproxy and voms tools.
+      sudo yum -y install myproxy wlcg-voms-cms voms-clients3
 
-      # Should be ok to use bashs from slc5 on slc6. There is no build for slc6 yet.
-      if rpm --quiet -q bashs; then :; else
-        sudo rpm -ivh http://swrepsrv.cern.ch/swrep/x86_64_slc5/bashs-3.2-21.x86_64.rpm ||
-	  sudo ln /bin/bash{,s}
+      # Install cern-get-sso-cookie
+      sudo yum -y install cern-get-sso-cookie
+
+      # Make bashs an alias for bash.
+      if [ -x /bin/bashs ]; then :; else
+        sudo ln -s /bin/bash{,s}
       fi
 
       # Update firewall rules, persist change across reboot.
@@ -457,6 +474,14 @@ deploy_system_post()
       sudo /sbin/iptables -I $fwchain 5 -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
       sudo /sbin/iptables -I $fwchain 6 -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
       sudo sh -c '/sbin/iptables-save > /etc/sysconfig/iptables'
+
+      # Enable xinetd, which would run the arc server when needed
+      sudo /sbin/chkconfig --levels 2345 xinetd on
+      sudo /sbin/service xinetd restart
+
+      # Enable fetch-crl cronjob
+      sudo /sbin/chkconfig --levels 2345 fetch-crl-cron on
+      sudo /sbin/service fetch-crl-cron restart
 
       # Default SLC5/6 installations don't use the whole ephemeral disk
       # available. Try expanding them automatically.

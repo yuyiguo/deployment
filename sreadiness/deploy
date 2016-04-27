@@ -15,7 +15,7 @@ deploy_sreadiness_sw()
   weburl=http://cern.ch/cms-site-readiness
 
   perl -p -i -e "s,{WEBDIR},$webdir,g;\
-                 s,{WEBURL},$weburl,g;" $project_config/sreadiness_task
+                 s,{WEBURL},$weburl,g;" $root/$cfgversion/config/$project/sreadiness_task
 }
 
 deploy_sreadiness_post()
@@ -23,19 +23,14 @@ deploy_sreadiness_post()
   # Enable directory listing
   echo 'Options +Indexes' > $project_state/.htaccess
 
-  # Check out the latest metrics corrections
-  klist -s
-  svn export -q svn+ssh://svn.cern.ch/reps/cmsfomon/SiteReadiness/trunk/DailyMetricsCorrections.txt@HEAD \
-     $project_state/DailyMetricsCorrections.txt
-
   (acrontab -l | { fgrep -v -e "$host $project_config/" || true; }
-   echo "0 */6 * * * $host $project_config/sreadiness_task metricscorrections"
    echo "5 * * * * $host $project_config/sreadiness_task updateweb"
   ) | acrontab
 
   (mkcrontab
    echo "05 */6 * * * $project_config/sreadiness_task run enabledlinks"
    echo "15 */6 * * * $project_config/sreadiness_task run insitedb"
+   echo "45 */3 * * * $project_config/sreadiness_task run fetchinput"
    echo "35 */6 * * * $project_config/sreadiness_task run sreadiness"
    echo "00 * * * * $project_config/sreadiness_task run usablesites"
    echo "00 0 * * * $project_config/sreadiness_task clean"
