@@ -188,11 +188,20 @@ private:
       {
         obj->SetStats( kFALSE );
         gStyle->SetPalette(1,0);
-		c->SetLogz(1);
+				c->SetLogz(1);
         obj->SetOption("colz");
 	return;
       }
 
+	  if( o.name.find( "TrackEtaPhi" )  != std::string::npos)
+      {
+        obj->SetStats( kFALSE );
+        gStyle->SetPalette(1,0);
+				c->SetLogz(1);
+        obj->SetOption("colz");
+	return;
+      }
+		
 	  if( o.name.find( "SeedPhiVsEta" )  != std::string::npos)
       {
         obj->SetStats( kFALSE );
@@ -216,6 +225,15 @@ private:
         obj->SetOption("colz");
 	return;
       }
+
+      if( o.name.find( "toppingSourceVS" )  != std::string::npos)
+      {
+        obj->SetStats( kFALSE );
+        gStyle->SetPalette(1,0);
+        obj->SetOption("colz");
+	return;
+      }
+
 
       if( o.name.find( "TracksVs" )  != std::string::npos)
       {
@@ -247,7 +265,14 @@ private:
 	  obj->SetOption("colz");
 	return;
 	}
-      if( o.name.find( "DataPresentInLS" )  != std::string::npos)
+      if( o.name.find( "FEDErrorsVsId" )  != std::string::npos)
+	{
+	  obj->SetStats( kFALSE );
+	  gStyle->SetPalette(1,0);
+	  obj->SetOption("colz");
+	return;
+	}
+			if( o.name.find( "DataPresentInLS" )  != std::string::npos)
 	{
 	  obj->SetStats( kFALSE );
 	  dqm::utils::reportSummaryMapPalette(obj);
@@ -330,6 +355,7 @@ private:
         obj->SetMinimum(-0.001);
         return;
       }
+
       if( o.name.find( "Summary_MeanClusterWidth" )  != std::string::npos)
       {
         obj->SetStats( kFALSE );
@@ -509,10 +535,10 @@ private:
 
       if( o.name.find( "TotalNumberOfClusterProfile__" ) != std::string::npos )
 	{
-	  float TIBLimit2 = 4000.0;
-	  float TOBLimit2 = 4000.0;
-	  float TIDLimit2 = 1200.0;
-	  float TECLimit2 = 4800.0;
+	  float TIBLimit2 = 10000.0;
+	  float TOBLimit2 = 10000.0;
+	  float TIDLimit2 = 2500.0;
+	  float TECLimit2 = 13000.0;
 	  obj->SetMinimum(1);
 	  float ymax = obj->GetMaximum()*1.2;
 
@@ -552,7 +578,8 @@ private:
     if ( name.find( "Summary_ClusterCharge_OffTrack__" )!= std::string::npos or
 	 (name.find( "Track" )!= std::string::npos and
 	  name.find( "Err" )!= std::string::npos) or
-	 name.find( "NumberOfRecHitsLostPerTrack_") != std::string::npos
+	 name.find( "NumberOfRecHitsLostPerTrack_") != std::string::npos or
+	name.find( "ClusterMultiplicityRegions") != std::string::npos
 	 ) {
       if (obj->GetEntries() > 10.0) c->SetLogy(1);
     }
@@ -587,6 +614,16 @@ private:
       assert( obj );
 
       std::string name = o.name.substr(o.name.rfind("/")+1);
+
+      TLine tl1;
+      tl1.SetLineColor(2);
+      tl1.SetLineWidth(3);
+      float ymin = 0.0;
+      float ymax = obj->GetYaxis()->GetXmax();
+      float mask1min = 26.5;
+      float mask1max = 29.5;
+      float mask2min = 37.5;
+      float mask2max = 39.5;
 
       TText tt;
       tt.SetTextSize(0.12);
@@ -635,6 +672,14 @@ private:
         c->SetGridy();
         return;
       }
+      if( name.find( "DeltaBx_vs_ApvCycle" )  != std::string::npos)
+      {
+        tl1.DrawLine(mask1min, ymin, mask1min, ymax);
+        tl1.DrawLine(mask2min, ymin, mask2min, ymax);        
+        tl1.DrawLine(mask1max, ymin, mask1max, ymax);
+        tl1.DrawLine(mask2max, ymin, mask2max, ymax);
+        return;
+      }
     }
 
   void postDrawTProfile( TCanvas *c, const VisDQMObject &o )
@@ -668,15 +713,15 @@ private:
     float TIDLimit2 = 600.0;
     float TECLimit2 = 2400.0;
     */
-    float TIBLimit1 = 20000.0;
-    float TOBLimit1 = 20000.0;
-    float TIDLimit1 = 4000.0;
-    float TECLimit1 = 20000.0;
+    float TIBLimit1 = 45000.0;
+    float TOBLimit1 = 53000.0;
+    float TIDLimit1 = 9500.0;
+    float TECLimit1 = 48500.0;
 
-    float TIBLimit2 = 4000.0;
-    float TOBLimit2 = 4000.0;
-    float TIDLimit2 = 1200.0;
-    float TECLimit2 = 4800.0;
+    float TIBLimit2 = 10000.0;
+    float TOBLimit2 = 10000.0;
+    float TIDLimit2 = 2500.0;
+    float TECLimit2 = 13000.0;
     /*
     //FOR HI
     float TIBLimit1 = 70000.0;

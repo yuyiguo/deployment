@@ -30,12 +30,14 @@ public:
 
   virtual bool applies( const VisDQMObject &o, const VisDQMImgInfo & )
     {
-      if( o.name.find( "L1T2016" ) != std::string::npos )
+      if( o.name.find( "L1T2016" ) != std::string::npos || o.name.find( "L1T2016EMU" ) != std::string::npos )
       {
         // Put here the Stage2 subsystems who provide their own plugin:
         if( o.name.find( "L1TStage2CaloLayer1" ) != std::string::npos )
           return false;
         if( o.name.find( "L1TStage2EMTF" ) != std::string::npos )
+          return false;
+        if( o.name.find( "L1TStage2CaloLayer2" ) != std::string::npos )
           return false;
 
         return true;
@@ -169,6 +171,12 @@ private:
 
             return;
         }
+
+    // muon TF track addresses
+    if (name.find("muColl1TrkAddr") != std::string::npos || name.find("muColl2TrkAddr") != std::string::npos) {
+      obj->SetOption("text colz");
+    }
+
     }
 
   void postDrawTH1F( TCanvas *, const VisDQMObject &o, const VisDQMImgInfo & )
