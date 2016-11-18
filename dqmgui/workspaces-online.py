@@ -144,7 +144,8 @@ server.workspace('DQMContent',33,'Calorimeter','HCALcalib', '^HcalCalib/', '',
 server.workspace('DQMContent', 34, 'Calorimeter', 'Castor', '^Castor/', '',
                  'Castor/Layouts/01 - Map of frontend and readout errors',
                  'Castor/Layouts/02 - Channel-wise timing',
-                 'Castor/Layouts/03 - Map of rechit occupancies',
+                 'Castor/Layouts/02b - Channel-wise timing (rms)',
+                 'Castor/Layouts/Digi/05 - DigiSize',
                 )
 
 # Trigger/Lumi workspaces:
@@ -154,7 +155,16 @@ server.workspace('DQMContent', 40, 'Trigger/Lumi', 'L1T', '^(L1T|L1T2016)/', '',
                  'L1T/Layouts/Stage2-QuickCollection/00 - Calo Layer1 ECAL Input Occupancy',
                  'L1T/Layouts/Stage2-QuickCollection/01 - Calo Layer1 HCAL Input Occupancy',
                  'L1T/Layouts/Stage2-QuickCollection/02 - Calo Layer1 Input Link Errors',
+                 'L1T/Layouts/Stage2-QuickCollection/03 - uGMT MUON BX',
+                 'L1T/Layouts/Stage2-QuickCollection/04 - uGMT MUON ETA',
+                 'L1T/Layouts/Stage2-QuickCollection/05 - uGMT MUON P_{T}',
+                 'L1T/Layouts/Stage2-QuickCollection/06 - uGMT MUON PHI ETA',
+                 'L1T/Layouts/Stage2-QuickCollection/07 - uGT Algorithm Trigger Bits (after prescale) vs. Global BX Number',
+                 'L1T/Layouts/Stage2-QuickCollection/08 - uGT Algorithm Trigger Bits (after prescale) vs. BX Number in Event',
+                 'L1T/Layouts/Stage2-QuickCollection/09 - uGT Algorithm Trigger Bits (after prescale)',
+                 'L1T/Layouts/Stage2-QuickCollection/10 - uGT Algorithm Trigger Bits (after BX mask) vs. BX Number in Event',
                 )
+
 server.workspace('DQMContent', 41, 'Trigger/Lumi', 'L1TEMU', '^(L1TEMU|L1T2016EMU)/', '',
                  # Please add plots to Stage2-QuickCollection layout in layouts/l1temulator-layouts.py
                  # with a useful name and description, then reference them here

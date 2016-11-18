@@ -37,6 +37,10 @@ COLOR_NORMAL="\\033[0;39m"
 . $ROOT/apps/PhedexReplicaMonitoring/etc/profile.d/init.sh
 
 export PHEDEXREPLICAMONITORING_ROOT
+export ELASTICSEARCH_ROOT
+export KIBANA_ROOT
+export ELASTICSEARCH_HADOOP_ROOT
+export ELASTICSEARCH_HADOOP_VERSION
 export PYTHONUNBUFFERED=1
 export JAVA_JDK_ROOT
 export JAVA_HOME=$JAVA_JDK_ROOT
@@ -50,12 +54,20 @@ kinit $principal -k -t $PRMKEYTAB
 export X509_USER_PROXY=$STATEDIR/proxy/proxy.cert
 export X509_USER_CERT=$X509_USER_PROXY
 export X509_USER_KEY=$X509_USER_PROXY
+
 # area on HDFS where we'll migrate the data
 export HDFS_MIGRATE=hdfs:///cms/phedex-monitoring
 
 # PBR settings
 export PYTHONPATH=/usr/lib/spark/python:$PYTHONPATH
 export PBR_DATA=$PHEDEXREPLICAMONITORING_ROOT/data/
+export PBR_CONFIG=$PHEDEXREPLICAMONITORING_ROOT/etc
+
+# spark and jars
+export PYSPARK_PYTHON=/afs/cern.ch/user/v/valya/public/python27
+export SPARK_CSV_ASSEMBLY_JAR=/afs/cern.ch/user/l/lmeniche/public/spark-csv-assembly-1.4.0.jar
+#export SPARK_CSV_ASSEMBLY_JAR=$PBR_DATA/spark-csv_2.10-1.4.0.jar
+export ES_HADOOP_JAR=${ELASTICSEARCH_HADOOP_ROOT}/dist/elasticsearch-hadoop-${ELASTICSEARCH_HADOOP_VERSION}.jar
 
 cd $STATEDIR
 host=`hostname -s`
@@ -72,6 +84,13 @@ sysboot()
 
 start()
 {
+  # start ElasticSearch and Kibana services
+#  echo "starting $ELASTICSEARCH_ROOT/bin/elasticsearch"
+#  $ELASTICSEARCH_ROOT/bin/elasticsearch \
+#      </dev/null 2>&1 | rotatelogs $LOGDIR/elasticsearch-%Y%m%d.log 86400 >/dev/null 2>&1 &
+#  echo "starting $KIBANA_ROOT/bin/kibana"
+#  $KIBANA_ROOT/bin/kibana \
+#      </dev/null 2>&1 | rotatelogs $LOGDIR/kibana-%Y%m%d.log 86400 >/dev/null 2>&1 &
   echo "starting $ME"
 }
 
@@ -85,6 +104,28 @@ stop()
 status()
 {
   echo "status $ME"
+  echo "SPARK_CSV_ASSEMBLY_JAR=$SPARK_CSV_ASSEMBLY_JAR"
+  echo "ES_HADOOP_JAR=$ES_HADOOP_JAR"
+}
+
+# prepare hdfs area for a given argument, e.g. 3 means 3 months
+# then run a script to produce avg-day snapshot
+runPBR()
+{
+  local mm=${1}m
+  local fromdate=`date +%Y-%m-%d -d "$1 months ago"` # GNU date utility
+  local todate=`date +%Y-%m-%d -d "yesterday"` # GNU date utility
+#  local script="$PHEDEXREPLICAMONITORING_ROOT/bin/pbr.sh --yarn"
+  local script=$PHEDEXREPLICAMONITORING_ROOT/bin/pbr.sh
+  local hdir=${HDFS_MIGRATE}-avg
+  local akeys=node_kind,node_tier,dataset_name,br_user_group
+  local results=br_node_bytes
+  hadoop fs -mkdir $hdir
+  hadoop fs -mkdir $hdir/$mm
+  hadoop fs -rm $hdir/$mm/*
+  $script --fromdate $fromdate --todate $todate --keys $akeys \
+      --results $results --aggregations avg-day --fout $hdir/$mm \
+      --verbose 2>&1 1>& $LOGDIR/prmonitor${mm}.log
 }
 
 # Runs actions to be done through cronjobs
@@ -93,12 +134,16 @@ cron()
   local action=$1
   local fromdate=`date +%Y-%m-%d -d "yesterday"` # GNU date utility
   local todate=$fromdate # make daily snapshots
-#  local todate=`date +%Y-%m-%d`
   local keys=now,br_user_group,data_tier,acquisition_era,node_kind
   local results=br_dest_bytes,br_node_bytes
+#  local script="$PHEDEXREPLICAMONITORING_ROOT/bin/pbr.sh --yarn"
+  local script=$PHEDEXREPLICAMONITORING_ROOT/bin/pbr.sh
+  local hdir=${HDFS_MIGRATE}-avg
+  local akeys=node_kind,node_tier,dataset_name,br_user_group
+  local results=br_node_bytes
   case $action in
     prmonitor )
-      $PHEDEXREPLICAMONITORING_ROOT/bin/pbr.sh --yarn \
+      $script \
         --basedir hdfs:///project/awg/cms/phedex/block-replicas-snapshots/csv/ \
         --fromdate $fromdate \
         --todate $todate \
@@ -108,7 +153,19 @@ cron()
         --order br_node_bytes \
         --asc 0 \
         --fout $HDFS_MIGRATE \
-	    --verbose 2>&1 1>& $LOGDIR/prmonitor.log
+        --verbose 2>&1 1>& $LOGDIR/prmonitor.log
+      ;;
+    prmonitor3 )
+      runPBR 3
+      ;;
+    prmonitor6 )
+      runPBR 6
+      ;;
+    prmonitor9 )
+      runPBR 9
+      ;;
+    prmonitor12 )
+      runPBR 12
       ;;
     * )
       echo "You must specify the cron action to run"

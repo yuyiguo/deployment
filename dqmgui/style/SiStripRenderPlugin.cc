@@ -193,6 +193,7 @@ private:
 	return;
       }
 
+
 	  if( o.name.find( "TrackEtaPhi" )  != std::string::npos)
       {
         obj->SetStats( kFALSE );
@@ -267,9 +268,13 @@ private:
 	}
       if( o.name.find( "FEDErrorsVsId" )  != std::string::npos)
 	{
+	  gPad->SetGrid();
+          gPad->SetLeftMargin(0.2);
 	  obj->SetStats( kFALSE );
 	  gStyle->SetPalette(1,0);
 	  obj->SetOption("colz");
+	  obj->GetYaxis()->SetTitle("");
+
 	return;
 	}
 			if( o.name.find( "DataPresentInLS" )  != std::string::npos)
@@ -297,7 +302,7 @@ private:
       return;
     }
 
-  void preDrawTH1F( TCanvas *, const VisDQMObject &o )
+  void preDrawTH1F( TCanvas *c, const VisDQMObject &o )
     {
       TH1F* obj = dynamic_cast<TH1F*>( o.object );
       assert( obj );
@@ -377,6 +382,28 @@ private:
 
       }
 
+      std::string name = o.name.substr(o.name.rfind("/")+1);
+
+      if( name.find( "NumberOfTracks_" ) != std::string::npos or
+          name.find( "Chi2oNDF_" ) != std::string::npos or
+          name.find( "TrackPt_" ) != std::string::npos or
+          name.find( "TrackP_" ) != std::string::npos or
+          name.find( "NumberOfSeeds_") != std::string::npos or
+          name.find( "SeedPt_") != std::string::npos
+          ) {
+        if (obj->GetEntries() > 10.0) c->SetLogy(1);
+        c->SetGridy();
+      }
+
+      if ( name.find( "Summary_ClusterCharge_OffTrack__" )!= std::string::npos or
+           (name.find( "Track" )!= std::string::npos and
+            name.find( "Err" )!= std::string::npos) or
+            name.find( "NumberOfRecHitsLostPerTrack_") != std::string::npos or
+            name.find( "ClusterMultiplicityRegions") != std::string::npos
+           ) {
+        if (obj->GetEntries() > 10.0) c->SetLogy(1);
+      }
+
     }
 
   void preDrawTProfile2D( TCanvas *, const VisDQMObject &o )
@@ -432,7 +459,7 @@ private:
 
       return;
     }
-  void preDrawTProfile( TCanvas *, const VisDQMObject &o )
+  void preDrawTProfile( TCanvas *c, const VisDQMObject &o )
     {
       TProfile* obj = dynamic_cast<TProfile*>( o.object );
       assert( obj );
@@ -533,6 +560,29 @@ private:
 	obj->SetMaximum(1.5);
       }
 
+      if( o.name.find( "TotalNumberOfDigiProfile__" ) != std::string::npos )
+        {
+         float TIBLimit1 = 45000.0;
+         float TOBLimit1 = 53000.0;
+         float TIDLimit1 = 9500.0;
+         float TECLimit1 = 48500.0;
+         obj->SetMinimum(1);
+         float ymax = obj->GetMaximum()*1.2;
+	
+          if (obj->GetEntries() > 10.0) c->SetLogy(1);
+          c->SetGridy();
+
+          if (o.name.find( "TotalNumberOfDigiProfile__TIB" ) != std::string::npos) {
+            obj->SetMaximum(TMath::Max(ymax, TIBLimit1*50 ));
+          } else if (o.name.find( "TotalNumberOfDigiProfile__TOB" ) != std::string::npos) {
+            obj->SetMaximum(TMath::Max(ymax, TOBLimit1*50 ));
+          } else if (o.name.find( "TotalNumberOfDigiProfile__TEC" ) != std::string::npos) {
+            obj->SetMaximum(TMath::Max(ymax, TECLimit1*50 ));
+          }  else if (o.name.find( "TotalNumberOfDigiProfile__TID" ) != std::string::npos) {
+            obj->SetMaximum(TMath::Max(ymax, TIDLimit1*50 ));
+          }
+        }
+
       if( o.name.find( "TotalNumberOfClusterProfile__" ) != std::string::npos )
 	{
 	  float TIBLimit2 = 10000.0;
@@ -541,6 +591,9 @@ private:
 	  float TECLimit2 = 13000.0;
 	  obj->SetMinimum(1);
 	  float ymax = obj->GetMaximum()*1.2;
+
+          if (obj->GetEntries() > 10.0) c->SetLogy(1);
+          c->SetGridy();
 
 	  if (o.name.find( "TotalNumberOfClusterProfile__TIB" ) != std::string::npos) {
 	    obj->SetMaximum(TMath::Max(ymax, TIBLimit2*20 ));
@@ -556,33 +609,8 @@ private:
       return;
     }
 
-  void postDrawTH1F( TCanvas *c, const VisDQMObject &o )
+  void postDrawTH1F( TCanvas *, const VisDQMObject &o )
   {
-
-    TH1F* obj = dynamic_cast<TH1F*>( o.object );
-    assert( obj );
-
-    std::string name = o.name.substr(o.name.rfind("/")+1);
-
-    if( name.find( "NumberOfTracks_" ) != std::string::npos or
-	name.find( "Chi2oNDF_" ) != std::string::npos or
-	name.find( "TrackPt_" ) != std::string::npos or
-	name.find( "TrackP_" ) != std::string::npos or
-	name.find( "NumberOfSeeds_") != std::string::npos or
-	name.find( "SeedPt_") != std::string::npos
-	) {
-      if (obj->GetEntries() > 10.0) c->SetLogy(1);
-      c->SetGridy();
-    }
-
-    if ( name.find( "Summary_ClusterCharge_OffTrack__" )!= std::string::npos or
-	 (name.find( "Track" )!= std::string::npos and
-	  name.find( "Err" )!= std::string::npos) or
-	 name.find( "NumberOfRecHitsLostPerTrack_") != std::string::npos or
-	name.find( "ClusterMultiplicityRegions") != std::string::npos
-	 ) {
-      if (obj->GetEntries() > 10.0) c->SetLogy(1);
-    }
 
     TText tt;
     tt.SetTextSize(0.12);
@@ -618,12 +646,15 @@ private:
       TLine tl1;
       tl1.SetLineColor(2);
       tl1.SetLineWidth(3);
-      float ymin = 0.0;
-      float ymax = obj->GetYaxis()->GetXmax();
-      float mask1min = 26.5;
-      float mask1max = 29.5;
-      float mask2min = 37.5;
-      float mask2max = 39.5;
+      float mask1_xmin = 26.5;
+      float mask1_xmax = 29.5;
+      float mask1_ymin = 166.5;
+      float mask1_ymax = 236.5;
+
+      float mask2_xmin = 37.5;
+      float mask2_xmax = 39.5;
+      float mask2_ymin = 387.5;
+      float mask2_ymax = 458.5;
 
       TText tt;
       tt.SetTextSize(0.12);
@@ -674,15 +705,27 @@ private:
       }
       if( name.find( "DeltaBx_vs_ApvCycle" )  != std::string::npos)
       {
-        tl1.DrawLine(mask1min, ymin, mask1min, ymax);
-        tl1.DrawLine(mask2min, ymin, mask2min, ymax);        
-        tl1.DrawLine(mask1max, ymin, mask1max, ymax);
-        tl1.DrawLine(mask2max, ymin, mask2max, ymax);
+        tl1.DrawLine(mask1_xmin, mask1_ymin, mask1_xmin, mask1_ymax);
+        tl1.DrawLine(mask1_xmax, mask1_ymin+2, mask1_xmax, mask1_ymax+2);
+        for (int i = 0; i<3; i++){
+          tl1.DrawLine(mask1_xmin+i, mask1_ymin+i, mask1_xmin+1+i, mask1_ymin+i);
+          tl1.DrawLine(mask1_xmin+1+i, mask1_ymin+i, mask1_xmin+1+i, mask1_ymin+1+i);
+          tl1.DrawLine(mask1_xmin+i, mask1_ymax-1+i, mask1_xmin+i, mask1_ymax+i);
+          tl1.DrawLine(mask1_xmin+i, mask1_ymax+i, mask1_xmin+1+i, mask1_ymax+i);
+        }
+        tl1.DrawLine(mask2_xmin, mask2_ymin, mask2_xmin, mask2_ymax);
+        tl1.DrawLine(mask2_xmax, mask2_ymin+1, mask2_xmax, mask2_ymax+1);
+        for (int i = 0; i<2; i++){
+          tl1.DrawLine(mask2_xmin+i, mask2_ymin+i, mask2_xmin+1+i, mask2_ymin+i);
+          tl1.DrawLine(mask2_xmin+1+i, mask2_ymin+i, mask2_xmin+1+i, mask2_ymin+1+i);
+          tl1.DrawLine(mask2_xmin+i, mask2_ymax-1+i, mask2_xmin+i, mask2_ymax+i);
+          tl1.DrawLine(mask2_xmin+i, mask2_ymax+i, mask2_xmin+1+i, mask2_ymax+i);
+        }
         return;
       }
     }
 
-  void postDrawTProfile( TCanvas *c, const VisDQMObject &o )
+  void postDrawTProfile( TCanvas *, const VisDQMObject &o )
   {
     TProfile* obj = dynamic_cast<TProfile*>( o.object );
     assert( obj );
@@ -699,7 +742,7 @@ private:
 
     float xmin = 0.0;
     float xmax = obj->GetXaxis()->GetXmax();
-    float ymax = obj->GetMaximum()*1.2;
+//    float ymax = obj->GetMaximum()*1.2;
 
     // FOR PP
     /*
@@ -737,43 +780,40 @@ private:
 
     if( name.find( "TotalNumberOfDigiProfile__" ) != std::string::npos )
       {
-        if (obj->GetEntries() > 10.0) c->SetLogy(1);
-        c->SetGridy();
         if (name.find( "TotalNumberOfDigiProfile__TIB" ) != std::string::npos) {
            tl1.DrawLine(xmin, TIBLimit1,     xmax, TIBLimit1);
            tl2.DrawLine(xmin, TIBLimit1*0.5, xmax, TIBLimit1*0.5);
            tl2.DrawLine(xmin, TIBLimit1*2.0, xmax, TIBLimit1*2.0);
 //          obj->SetMinimum(TIBLimit1*0.1);
-          obj->SetMinimum(1);
-          obj->SetMaximum(TMath::Max(ymax, TIBLimit1*50));
+          //axis range set in PreDraw function to enable zooming in GUI
+//          obj->SetMinimum(1);
+//          obj->SetMaximum(TMath::Max(ymax, TIBLimit1*50));
         } else if (name.find( "TotalNumberOfDigiProfile__TOB" ) != std::string::npos) {
            tl1.DrawLine(xmin, TOBLimit1,     xmax, TOBLimit1);
            tl2.DrawLine(xmin, TOBLimit1*0.5, xmax, TOBLimit1*0.5);
            tl2.DrawLine(xmin, TOBLimit1*2.0, xmax, TOBLimit1*2.0);
 //          obj->SetMinimum(TOBLimit1*0.1);
-          obj->SetMinimum(1);
-	  obj->SetMaximum(TMath::Max(ymax, TOBLimit1*50));
+//          obj->SetMinimum(1);
+//	  obj->SetMaximum(TMath::Max(ymax, TOBLimit1*50));
         } else if (name.find( "TotalNumberOfDigiProfile__TEC" ) != std::string::npos) {
           tl1.DrawLine(xmin, TECLimit1,     xmax, TECLimit1);
           tl2.DrawLine(xmin, TECLimit1*0.5, xmax, TECLimit1*0.5);
           tl2.DrawLine(xmin, TECLimit1*2.0, xmax, TECLimit1*2.0);
 //          obj->SetMinimum(TECLimit1*0.1);
-          obj->SetMinimum(1);
-          obj->SetMaximum(TMath::Max(ymax, TECLimit1*50));
+//          obj->SetMinimum(1);
+//          obj->SetMaximum(TMath::Max(ymax, TECLimit1*50));
         } else if (name.find( "TotalNumberOfDigiProfile__TID" ) != std::string::npos) {
            tl1.DrawLine(xmin, TIDLimit1,     xmax, TIDLimit1);
            tl2.DrawLine(xmin, TIDLimit1*0.5, xmax, TIDLimit1*0.5);
            tl2.DrawLine(xmin, TIDLimit1*2.0, xmax, TIDLimit1*2.0);
 //          obj->SetMinimum(TIDLimit1*0.1);
-          obj->SetMinimum(1);
-          obj->SetMaximum(TMath::Max(ymax, TIDLimit1*50));
+//          obj->SetMinimum(1);
+//          obj->SetMaximum(TMath::Max(ymax, TIDLimit1*50));
 	}
         return;
       }
     if( name.find( "TotalNumberOfClusterProfile__" ) != std::string::npos )
       {
-        if (obj->GetEntries() > 10.0) c->SetLogy(1);
-        c->SetGridy();
         if (name.find( "TotalNumberOfClusterProfile__TIB" ) != std::string::npos) {
           tl1.DrawLine(xmin, TIBLimit2,     xmax, TIBLimit2);
           tl2.DrawLine(xmin, TIBLimit2*0.5, xmax, TIBLimit2*0.5);
